@@ -1,159 +1,425 @@
-**CRM SaaS Product**
+**A&S Fincare CRM**
 
 **Product & Wireframe Specification — V1**
+
 
 **1. Product Definition**
 
 **Product purpose**
 
-A lightweight SaaS CRM designed for small businesses to:
+A&S Fincare CRM is a CRM application built exclusively for A&S Fincare.
+It is not a generic CRM product and is not configured, licensed or
+resold for use by any other business.
+
+The application supports A&S Fincare's insurance distribution work:
 
 > • manage leads and customers
 >
-> • assign work to team members
+> • organize sales work across the A&S Fincare reporting hierarchy
+>
+> • assign leads to teams and to individual users
 >
 > • schedule and track follow-ups
 >
 > • maintain customer history
 >
-> • track products/services purchased by customers
+> • record the insurance products a customer has purchased
 >
-> • track renewal, expiry or other important due dates
+> • track renewal, expiry and other important due dates
 >
 > • initiate customer calls from the CRM with one tap, then record the
 > outcome and next follow-up
 >
 > • send WhatsApp messages and reminders
 >
-> • receive and manage customer WhatsApp replies through a lightweight
-> shared inbox
+> • receive and manage customer WhatsApp replies through a shared inbox
 >
 > • send business emails and email reminders to leads and customers
 >
-> • view simple operational and business reports
+> • measure sales performance across the reporting hierarchy
+>
+> • view operational and business reports
 
 **Product principle**
 
-The product should remain simple enough for a small business to start
-using without CRM expertise.
+The application serves one organization. There is no tenant, workspace
+or customer-account concept, no industry or business-type selection, and
+no option to choose which core parts of the CRM are in use.
 
-Configuration should allow the same application to support businesses
-such as:
+Leads, Customers, Customer Purchases, Follow-ups, Renewals & Reminders,
+WhatsApp, Email and Reports are all part of V1 and are always available,
+subject to the role and visibility rules in Section 2.
 
-> • insurance and financial services
->
-> • PUC/certificate centres
->
-> • vehicle service businesses
->
-> • agencies
->
-> • maintenance/service providers
->
-> • membership-based businesses
->
-> • other small sales/service businesses
+The operating flow is:
 
-The system should **not require every business to use Leads**.
+Lead → Assign → Follow-up → Customer → Customer Purchase → Renewal
 
-A business may operate using:
+The application should remain simple enough to be used by Salespersons
+and Team Leads without CRM expertise.
 
-Lead → Follow-up → Customer → Service → Renewal
+**Technical direction**
 
-or:
+V1 is delivered as a single responsive web application:
 
-Customer → Service → Renewal / Reminder
+> • Next.js using the App Router
+>
+> • TypeScript
+>
+> • Tailwind CSS
+>
+> • installable Progressive Web App behaviour, defined in Section 210.1
+>
+> • Supabase / PostgreSQL
+>
+> • Drizzle ORM
+>
+> • Supabase Auth
+>
+> • Supabase Storage
+>
+> • Meta WhatsApp Cloud API
+>
+> • the full Email module in V1
 
-**2. User Roles**
+Salespersons and Team Leads work primarily from a phone. Admins and
+Managers use both desktop and mobile. Calling uses the phone's normal
+dialer through click-to-call as defined in Sections 29–33; in-app
+VoIP is not part of the product.
 
-**2.1 Owner / Admin**
+This is the approved technical direction for V1. It should not be
+extended without approval.
 
-Can:
 
-> • access all CRM records
->
-> • manage users
->
-> • configure the CRM
->
-> • configure pipelines
->
-> • configure custom fields
->
-> • configure products/services
->
-> • configure reminder settings
->
-> • connect WhatsApp
->
-> • manage WhatsApp templates
->
-> • configure the workspace Email sender
->
-> • manage Email templates
->
-> • send individual and controlled bulk Emails
->
-> • import/export data
->
-> • access all reports
->
-> • assign/reassign records
->
-> • manage business settings
+**2. User Roles, Hierarchy and Visibility**
 
-**2.2 Manager**
+This section is the authoritative definition of the A&S Fincare role
+model, reporting hierarchy, record ownership and data visibility. Later
+sections apply these rules and refer back to them. Where another section
+appears to describe the model differently, this section governs.
 
-Can:
+## 2.1 Predefined Roles
 
-> • view permitted Leads and Customers
->
-> • manage Leads and Customers
->
-> • assign/reassign records where permitted
->
-> • view permitted Follow-ups
->
-> • send individual Emails
->
-> • send manual and controlled bulk Email reminders where permitted
->
-> • handle WhatsApp conversations
->
-> • view Reports
->
-> • perform permitted operational bulk actions
+The application has exactly four predefined roles:
 
-Should not automatically have access to sensitive system configuration
-unless permitted.
+> • Admin
+>
+> • Manager
+>
+> • Team Lead
+>
+> • Salesperson
 
-**2.3 Staff / Sales User**
+These four roles are fixed by the application. The CRM does not provide
+custom role creation or editable role capabilities. See Section 2.6.
 
-Can:
+## 2.2 Organizational Hierarchy
 
-> • view owned/permitted Leads and Customers
->
-> • update records
->
-> • complete and schedule follow-ups
->
-> • call permitted Leads and Customers and record call outcomes
->
-> • send WhatsApp messages
->
-> • manage assigned WhatsApp conversations
->
-> • process renewals/reminders
->
-> • add notes and activities
+```text
+Admin
+└── Manager
+    └── Team Lead / Team
+        └── Salesperson
+```
 
-Should not have access to organization-wide configuration by default.
+Cardinality rules:
+
+> • Admin sits above all Managers.
+>
+> • A Manager may supervise multiple Team Leads, and therefore multiple
+> teams.
+>
+> • Each Team Lead reports to exactly one Manager.
+>
+> • Each Team Lead leads exactly one team.
+>
+> • Each team has exactly one Team Lead.
+>
+> • Each Salesperson belongs to exactly one team, and therefore to
+> exactly one Team Lead.
+>
+> • A Team Lead's group is the team. There is no additional team layer
+> beneath the Team Lead.
+
+A **team** is a first-class record consisting of its Team Lead and the
+Salespersons assigned to that Team Lead. Teams are part of the
+application, not an optional structure.
+
+Admin maintains roles, reporting relationships and team membership.
+Administration of users and teams is defined in Sections 185, 185.1 and
+186.
+
+## 2.3 Visibility Model
+
+Visibility follows the reporting hierarchy:
+
+> • **Admin** — organization-wide visibility.
+>
+> • **Manager** — restricted to that Manager's own reporting hierarchy:
+> their Team Leads, those Team Leads' teams, and the records belonging
+> to them.
+>
+> • **Team Lead** — restricted to their own team: their own records and
+> the records of the Salespersons in their team.
+>
+> • **Salesperson** — restricted to the records assigned to them,
+> together with any narrow shared reference data explicitly defined
+> elsewhere in this specification.
+
+**Peer isolation**
+
+> • A Manager must not see another Manager's restricted operational
+> branch.
+>
+> • A Team Lead must not see another Team Lead's team or restricted
+> operational records.
+>
+> • A Salesperson does not receive organization-wide or peer visibility,
+> including of other Salespersons in the same team.
+
+**Where these restrictions apply**
+
+Dashboards, record lists and detail screens, activity views, reports,
+search, notifications and exports.
+
+A restriction that holds on a list screen must hold everywhere the same
+data can be reached: totals, counts, drill-downs, filter option lists,
+autocomplete suggestions, report breakdowns, exported files and
+notification text. A user must not be able to infer the existence, size
+or activity of a branch they cannot see.
+
+**Enforcement**
+
+The hierarchy must be enforced on the server for every read and every
+write. Hiding navigation items, buttons, columns or widgets is
+presentation, not authorization. A request for a record outside the
+user's permitted scope must be refused by the server even when the
+interface would never offer it.
+
+## 2.4 Supervisory and Operational Roles
+
+Admin and Manager are **supervisory** roles. Team Lead and Salesperson
+are **operational** roles. A Team Lead is additionally a supervisor
+within their own team.
+
+**Admin**
+
+Admin is supervisory and does not own operational records.
+
+Admin may:
+
+> • view organization-wide information
+>
+> • assign the predefined roles
+>
+> • maintain the reporting hierarchy
+>
+> • maintain teams
+>
+> • configure approved business settings
+>
+> • configure Lead Priority values
+>
+> • supervise assignment and reassignment across the organization
+>
+> • access organization-wide dashboards and reports
+
+Admin must not be the Record Owner or operational Assigned To user of:
+
+> • Leads
+>
+> • Customers
+>
+> • Customer Purchases
+>
+> • follow-ups
+>
+> • renewals
+>
+> • WhatsApp conversations
+
+Admin cannot create custom roles or change the capabilities attached to
+a role.
+
+**Manager**
+
+Manager is supervisory and does not own operational records.
+
+Manager may:
+
+> • view information below them in their own reporting hierarchy
+>
+> • supervise their Team Leads and teams
+>
+> • assign and reassign records within their hierarchy where the
+> relevant workflow permits
+>
+> • view dashboards and reports for their own branch
+>
+> • reply to WhatsApp conversations within their hierarchy without
+> becoming the conversation owner
+
+Manager must not be the Record Owner or operational Assigned To user of:
+
+> • Leads
+>
+> • Customers
+>
+> • Customer Purchases
+>
+> • follow-ups
+>
+> • renewals
+>
+> • WhatsApp conversations
+
+A Manager must not see another Manager's restricted operational branch.
+
+**Team Lead**
+
+Team Lead is both a supervisor and an operational user.
+
+Team Lead:
+
+> • leads exactly one team
+>
+> • reports to exactly one Manager
+>
+> • may own and work Leads
+>
+> • may own related Customers and operational records
+>
+> • may personally close sales
+>
+> • sees their own work and the work of the Salespersons in their team
+>
+> • may supervise and reassign work within their team where the relevant
+> workflow permits
+>
+> • must not see another Team Lead's team
+
+**Salesperson**
+
+Salesperson is an operational user.
+
+Salesperson:
+
+> • belongs to exactly one Team Lead's team
+>
+> • may own and work Leads
+>
+> • may own related Customers and operational records
+>
+> • may close sales
+>
+> • sees their own assigned operational records
+>
+> • does not receive organization-wide or peer visibility
+
+## 2.5 Ownership Model
+
+**Record Owner** is the Team Lead or Salesperson primarily responsible
+for a Lead or Customer relationship. **Assigned To** is the Team Lead or
+Salesperson responsible for completing a specific Follow-up, Renewal
+action or WhatsApp conversation.
+
+The following rules apply throughout the specification:
+
+> • Only Team Leads and Salespersons may be a Record Owner or an
+> operational Assigned To user.
+>
+> • Admins and Managers must never be selectable as operational owners
+> or assignees. This applies to creation, editing, import mapping,
+> automatic assignment and reassignment alike.
+>
+> • Supervision, viewing, replying, assignment or reassignment by an
+> Admin or Manager does not transfer ownership to that supervisor.
+>
+> • Dashboard and report totals shown to a Manager or an Admin are
+> hierarchical roll-ups. They do not imply personal ownership of the
+> underlying records.
+>
+> • Ownership and visibility are different concepts. A user may have
+> visibility over a record without owning it, and ownership is never
+> inferred from the ability to see or act on a record.
+>
+> • Ownership, assignment and reassignment must be authorized according
+> to the reporting hierarchy in Section 2.3, and enforced on the server.
+
+Assignment, reassignment and ownership changes are auditable actions.
+Detailed audit-history requirements are defined in Section 208.
+
+## 2.6 Fixed Roles and Permissions
+
+Role capabilities are defined by the application and are not
+configurable inside the CRM.
+
+The CRM does not provide:
+
+> • custom role creation
+>
+> • a permission builder
+>
+> • capability toggles for a role
+>
+> • an editable permission matrix
+>
+> • a configurable "All Records / Own Records" security scope
+>
+> • per-user permission overrides that bypass the reporting hierarchy
+
+Admin may assign one of the four predefined roles, maintain reporting
+relationships and maintain team membership. Admin may not redefine what
+a role is permitted to do.
+
+The detailed action-by-action permission matrix has not been finalized.
+It will be finalized with the client during development and approved
+before security implementation and UAT. Outstanding action-level
+decisions are listed in Section 188 and are marked *Pending client
+confirmation before security implementation and UAT*. No answer should
+be assumed for them, and they must not be presented as settings an Admin
+can configure.
+
+Changing what a role can do is an application change. It requires a
+reviewed change/change-control process and a new release.
+
+**Configurable business data is not a configurable permission**
+
+Admin configures some business data — for example Lead Priority values,
+and other business configuration defined elsewhere in this
+specification. Configuring business data does not change any role's
+security scope and must never be presented as a permission setting.
+
+## 2.7 WhatsApp Visibility Exception
+
+WhatsApp conversations follow the hierarchy in Section 2.3, with one
+deliberate exception for conversations that have no assignee:
+
+> • All Admins and Managers can see unassigned WhatsApp conversations.
+>
+> • Admin may assign an unassigned conversation to any active Team
+> Lead.
+>
+> • Manager may assign an unassigned conversation to an active Team
+> Lead reporting to that Manager.
+>
+> • Admin and Manager may reply only to **assigned** conversations
+> within their permitted scope, and do not become the conversation owner
+> by replying.
+>
+> • **No user, including an Admin or a Manager, may reply while a
+> conversation is unassigned.** It must first be assigned to a Team
+> Lead.
+
+This is stated here because it qualifies the core visibility model. The
+complete WhatsApp inbox, assignment and reassignment rules are defined
+in the WhatsApp module sections.
+
 
 **3. Overall Application Navigation**
 
 **Desktop sidebar**
 
-> **Logo / Business Name**
+> **A&S Fincare**
 >
 > **Dashboard**
 >
@@ -175,9 +441,14 @@ Should not have access to organization-wide configuration by default.
 
 **Navigation principles**
 
+Navigation is the same for every role. What differs is the scope of the
+data behind each item, and whether an item is available to that role at
+all. Hiding an item is presentation only; access is enforced on the
+server as required by Section 2.3.
+
 **Leads**
 
-May be disabled by businesses that do not use a lead process.
+Always available. Lead visibility follows the reporting hierarchy.
 
 **Customers**
 
@@ -193,8 +464,8 @@ Central area for expiry dates, renewals and recurring customer actions.
 
 **WhatsApp**
 
-Communication module containing inbox, message history and templates
-where permitted.
+Communication module containing the shared inbox, message history and
+templates, scoped by role.
 
 **Email**
 
@@ -202,18 +473,22 @@ Email does not require a separate primary navigation item in V1. Email actions a
 
 **Reports**
 
-Simple reporting only.
+Operational and performance reporting, scoped by role.
 
 **Settings**
 
-Visible primarily to Owner/Admin; certain subsections may be available
-to Managers.
+Visible to Admin. A small number of subsections are available to other
+roles where this specification states so explicitly.
+
 
 **4. Global Top Bar**
 
 Every authenticated desktop screen should use a consistent top bar.
 
 **Page Title Global Search Notifications User/Profile**
+
+Global Search and Notifications return only results within the
+signed-in user's permitted scope, as defined in Section 2.3.
 
 Optional primary action depending on screen:
 
@@ -223,13 +498,15 @@ or:
 
 **+ Add Customer**
 
-Do **not** permanently display **+ Add Lead** if Leads have been
-disabled for the workspace.
+The primary action is shown only where the signed-in user's role can
+complete it. Any Lead or Customer created must be given a Record Owner
+who is a Team Lead or Salesperson, in accordance with Section 2.5.
+
 
 **5. Global Search**
 
-This needs to be useful to a small business without becoming
-complicated.
+Search should be quick to use and should not require the user to choose a
+record type first.
 
 Search should support:
 
@@ -241,18 +518,13 @@ Search should support:
 >
 > • email
 >
-> • business-specific reference number
->
-> • configured reference/identifier fields such as Policy Number,
-> Vehicle Number, Certificate Number or Membership Number.
+> • policy or reference number
 
 Examples:
 
 **"Ramesh"**
 
 **"98470"**
-
-**"KL-07-AB-1234"**
 
 **"STAR/FH/44120"**
 
@@ -270,14 +542,28 @@ Search result grouping:
 
 **98470...**
 
-**CUSTOMER SERVICES**
+**CUSTOMER PURCHASES**
 
-**Vehicle PUC**
+**Family Health Optima · Star Health**
 
-**KL-07-AB-1234**
+**STAR/FH/44120**
 
 Selecting a result opens the corresponding record.
 
+**Scope**
+
+Search returns only records within the user's authorized scope under
+Section 2.3. A Salesperson finds their own records; a Team Lead their
+team's; a Manager their branch's; an Admin the organization's.
+
+Search must not disclose the existence of an out-of-scope record — not
+through a result row, a result count, an autocomplete suggestion, or a
+message stating that a matching record exists elsewhere. Where a
+supervisor needs to locate a record held in another branch, that is an
+escalation, not a search result.
+
+Search is enforced server-side. Filtering results after retrieval is not
+sufficient.
 **6. Notification Centre**
 
 Examples:
@@ -286,17 +572,24 @@ Examples:
 >
 > • follow-up overdue
 >
-> • lead assigned
+> • lead assigned to you
 >
-> • customer assigned
+> • customer assigned to you
+>
+> • Customer Purchase assigned to you
+>
+> • required policy documents outstanding on a Customer Purchase
 >
 > • renewal approaching
 >
 > • overdue renewal
 >
-> • WhatsApp conversation assigned
+> • WhatsApp conversation assigned to you
 >
 > • new WhatsApp reply
+>
+> • unassigned WhatsApp conversation awaiting assignment — Admins and
+> Managers only
 >
 > • import completed
 >
@@ -308,7 +601,9 @@ Examples:
 >
 > • Email bounced
 >
-> • workspace Email sender requires administrator attention
+> • Email sender requires administrator attention
+>
+> • role, team or reporting-line change affecting you
 
 Each notification should:
 
@@ -320,48 +615,70 @@ Each notification should:
 >
 > • open the relevant screen/record
 
-**7. First-Time SaaS Onboarding**
+**Scope**
 
-The onboarding should be short.
+Notification content and delivery follow the reporting hierarchy in
+Section 2.3. A notification must never reveal a record, customer name,
+message content or figure outside the recipient's authorized scope,
+including in its title, preview text or badge count. Unread counts are
+scoped the same way.
 
-**Screen 1 — Welcome / Create Business Workspace**
+Opening a notification reauthorizes access on the server. Full
+notification behaviour is defined in Section 204.
+**7. Initial Application Setup**
+
+The application is deployed for A&S Fincare and is already configured as
+that organization. There is no sign-up, no organization creation, no
+tenant or workspace creation and no industry selection.
+
+Initial setup is performed by an Admin after first sign-in. It should be
+short.
+
+**Screen 1 — Organization Details**
 
 **Purpose**
 
-Create the tenant/workspace for the business.
+Confirm the operating details the application needs in order to schedule
+work correctly.
 
 **Fields**
 
-> • Business Name — required
+> • Organization Name — prefilled as A&S Fincare
 >
-> • Business Type — optional dropdown
+> • Business Phone
 >
-> • Country — required/default detected if appropriate
+> • Business Email
 >
-> • Timezone — default based on country, editable
+> • Address
 >
-> • Currency — default based on country, editable
+> • Country
+>
+> • Timezone — used for scheduled follow-ups and automated reminders
+>
+> • Currency
 
-**Business Type examples**
+These are operating details. They do not change the application's
+identity, its feature set or any role's scope.
 
-> • Financial / Insurance
->
-> • Automotive
->
-> • Service Business
->
-> • Agency
->
-> • Education
->
-> • Healthcare/Wellness
->
-> • Retail
->
-> • Other
+**Setup steps**
 
-This value should initially help with setup/templates only; it should
-**not lock the CRM into an industry**.
+> 1. Organization details
+>
+> 2. Users, teams and reporting hierarchy — Section 11
+>
+> 3. Insurance catalogue — Section 9
+>
+> 4. Renewal and reminder defaults — Section 10
+>
+> 5. Import existing data — Section 12
+>
+> 6. Connect WhatsApp — Section 13
+>
+> 7. Configure Email sender — Section 14
+
+Step 2 must be completed before normal CRM use, because assignment and
+visibility depend on a valid hierarchy. The remaining steps may be
+completed later without blocking the application.
 
 **Actions**
 
@@ -373,92 +690,76 @@ Secondary:
 
 **Sign out**
 
-**8. Onboarding — Select How You Will Use the CRM**
+
+**8. A&S Fincare V1 Functional Scope**
+
+The application is built for A&S Fincare only. There is no step in which
+a business chooses which parts of the CRM it will use, and there are no
+optional core modules.
+
+The following are part of V1 and are always available, subject to the
+role and visibility rules in Section 2:
+
+> • Leads
+>
+> • Customers
+>
+> • Customer Purchases
+>
+> • Follow-ups
+>
+> • Renewals & Reminders
+>
+> • WhatsApp
+>
+> • Email
+>
+> • Reports
+>
+> • Data Import & Export
+>
+> • Settings & Administration
+
+What a given user sees of each area is determined by their role and
+their position in the reporting hierarchy, never by a module switch.
+
+Some areas depend on configuration rather than on being enabled. WhatsApp
+sending requires a connected WhatsApp account; Email sending requires a
+verified sender. When that configuration is missing the affected actions
+are unavailable and explain why, as defined in the relevant sections.
+This is a configuration state, not an optional module.
+
+This section is a temporary placement to preserve existing section
+numbering. Final placement and renumbering belong to the
+document-structure pass.
+
+
+**9. Setup — Build the Product Catalogue**
 
 **Purpose**
 
-Allow the product to simplify itself according to the business.
+Enter the insurance products A&S Fincare distributes, so that Leads and
+Customer Purchases can reference them.
 
-**Question**
+The catalogue has three levels, defined in Section 66:
 
-> What would you like to manage?
+> **Product Category** → **Provider** → **Plan / Sub-product**
 
-Options:
+Setup collects them in that order, because each level depends on the one
+above.
 
-☑ **Leads and sales enquiries**
+Example of the shape of the data:
 
-☑ **Customer follow-ups**
-
-☑ **Products / services used by customers**
-
-☑ **Renewals / expiry dates / recurring reminders**
-
-☑ **WhatsApp customer communication**
-
-☑ **Email customer communication**
-
-At minimum, Customer Management remains enabled.
-
-Module dependencies defined under Settings → Modules & Features also
-apply during onboarding. Renewals & Reminders cannot be enabled unless
-Products & Services is enabled.
-
-**Example behaviour**
-
-If:
-
-**Leads and sales enquiries = OFF**
-
-then:
-
-> • Leads disappears from navigation
+> **Health Insurance** (Product Category)
 >
-> • Pipeline widgets disappear from Dashboard
+> **\[ Star Health \]** (Provider)
 >
-> • Lead-related settings are hidden
-
-If:
-
-**Renewals/reminders = OFF**
-
-The module is hidden from normal navigation and related Dashboard
-widgets/actions are not shown.
-
-Modules can later be enabled/disabled from Settings.
-
-**Actions**
-
-**Continue**
-
-**Skip and use recommended setup -** If selected, the default setup
-enables Leads, Customer Follow-ups, Products/Services, Renewals &
-Reminders, WhatsApp and Email. These modules can later be changed from
-Settings.
-
-**9. Onboarding — Define Products / Services**
-
-**Purpose**
-
-Allow the business to define what it provides without requiring
-developer setup.
-
-Display only if Products & Services is enabled.
-
-Example:
-
-> **What does your business provide?**
+> **\[ Family Health Optima \]** (Plan / Sub-product)
 >
-> **\[Pollution Certificate \]**
->
-> **\[+ Add another \]**
+> **\[ + Add another \]**
 
-or
-
-> **\[Health Insurance \]**
->
-> **\[Vehicle Insurance \]**
->
-> **\[Home Loan \]**
+These names are examples only. They are not seeded values, and A&S
+Fincare's actual catalogue is entered here by Admin.
 
 Fields per item:
 
@@ -466,8 +767,11 @@ Fields per item:
 >
 > • Optional description
 
-Do not request complex pricing, categories, tax configuration, etc.
-during onboarding.
+Do not request complex pricing, tax configuration or provider
+integration during setup.
+
+A Customer purchases a **Plan/Sub-product**, never a Product Category or
+a Provider on its own.
 
 **Actions**
 
@@ -477,23 +781,20 @@ during onboarding.
 
 **Skip for now**
 
-**10. Onboarding — Renewal / Important Date Setup**
+The catalogue may be completed later from Settings → Product Catalogue,
+as defined in Section 193. Required policy documents per plan are
+configured there.
 
-Only display if the business selected renewal/reminder tracking.
+
+**10. Setup — Renewal and Reminder Defaults**
 
 **Purpose**
 
-Ask a simple question:
+Confirm the default reminder schedule that new Customer Purchase
+reminder schedules will start from.
 
-> Do your products or services have renewal or expiry dates?
-
-Options:
-
-**Yes**
-
-**Not now**
-
-If Yes:
+Renewal tracking and automatic renewal reminders are part of V1. This
+step sets defaults; it does not decide whether the capability exists.
 
 Default reminder schedule
 
@@ -503,7 +804,7 @@ Default reminder schedule
 
 ☑ **1 day before**
 
-Channel:
+Channels:
 
 ☑ **In-app reminder**
 
@@ -515,45 +816,89 @@ If WhatsApp is not connected, choosing WhatsApp should explain:
 
 > **You can configure WhatsApp after setup.**
 
-If the workspace Email sender is not configured and verified, choosing
-Email should explain:
+If the Email sender is not configured and verified, choosing Email
+should explain:
 
 > **You can configure Email after setup.**
 
-Selecting a channel during onboarding records a preference only. It does
-not enable sending until the relevant channel is configured.
+Selecting a channel during setup records a preference only. It does not
+enable sending until the relevant channel is configured.
 
-No technical API setup should happen inside this onboarding step.
+No technical API setup should happen inside this setup step.
 
-**11. Onboarding — Invite Team**
+The schedule shown above is illustrative. The reminder schedules,
+channel preference and template content A&S Fincare will use are
+*pending client confirmation*.
 
-**Fields**
+The full renewal automation requirements are defined in Section 195.1.
 
-Each invited user:
+
+**11. Setup — Create Users, Teams and Reporting Hierarchy**
+
+This step establishes the A&S Fincare structure defined in Section 2.2.
+It is the only setup step that must be completed before the CRM can be
+used normally, because assignment and visibility depend on it.
+
+**Fields per user**
 
 > • Name
 >
 > • Email
 >
 > • Role
+>
+> • Reporting Manager — required for a Team Lead
+>
+> • Team — required for a Team Lead and for a Salesperson
 
 Role options:
 
+> • Admin
+>
 > • Manager
 >
-> • Staff
+> • Team Lead
+>
+> • Salesperson
 
-The owner is already the current user.
+The signed-in user performing setup is already an Admin.
+
+**Order**
+
+Because of the cardinality rules in Section 2.2, users are created top
+down:
+
+> 1. Managers
+>
+> 2. Teams, each with exactly one Team Lead, and each Team Lead linked
+> to exactly one Manager
+>
+> 3. Salespersons, each linked to exactly one team
+
+**Validation**
+
+Setup must not complete with an invalid hierarchy. The application must
+reject a structure in which:
+
+> • a Team Lead has no Manager
+>
+> • a Team Lead has no team, or leads more than one team
+>
+> • a team has no Team Lead, or more than one
+>
+> • a Salesperson has no team, or belongs to more than one
 
 **Actions**
 
-**+ Invite another**
+**+ Add another**
 
 **Send invitations & continue**
 
-**Skip**
+Ongoing user, team and hierarchy administration is defined in Sections
+185, 185.1 and 186.
 
-**12. Onboarding — Import Existing Data**
+
+**12. Setup — Import Existing Data**
 
 Options:
 
@@ -563,20 +908,21 @@ Options:
 
 **\[ Start Fresh \]**
 
-Show **Import Leads** only if Leads is enabled.
-
 Choosing Import should take users to the full import workflow later
 defined in the specification.
 
 The setup wizard should not attempt to embed the complete mapping
 interface into this step.
 
-**13. Onboarding — Connect WhatsApp**
+Imported Leads and Customers must be assigned to a Team Lead or
+Salesperson in accordance with Section 2.5. Import assignment is defined
+in the Data Import & Export sections.
 
-Because WhatsApp is a core product feature, onboarding should mention it
-clearly.
 
-Display only if WhatsApp is enabled.
+**13. Setup — Connect WhatsApp**
+
+Because WhatsApp is a core part of how A&S Fincare communicates with
+customers, setup should cover it clearly.
 
 **Content**
 
@@ -588,26 +934,24 @@ Display only if WhatsApp is enabled.
 
 **Set up later**
 
-The detailed integration workflow will be defined under the WhatsApp
-module.
+The detailed integration workflow is defined under the WhatsApp module.
 
 **Important state**
 
 If the connection cannot be completed:
 
-> • onboarding must continue
+> • setup must continue
 >
 > • WhatsApp features display **Not connected**
 >
 > • no core CRM functionality should be blocked
 
-## 13.1 Onboarding — Configure Email
 
-Display only if Email is enabled.
+**14. Setup — Configure Email**
 
-Email requires a verified sender before the workspace can send anything,
-so onboarding should introduce it clearly rather than leaving it to be
-discovered later.
+Email requires a verified sender before the application can send
+anything, so setup should introduce it clearly rather than leaving it to
+be discovered later.
 
 **Content**
 
@@ -625,9 +969,9 @@ Email Settings and the Email Communications module.
 
 **Important state**
 
-If the sender cannot be configured or verified during onboarding:
+If the sender cannot be configured or verified during setup:
 
-> • onboarding must continue
+> • setup must continue
 >
 > • Email features display **Not configured**
 >
@@ -638,7 +982,8 @@ If the sender cannot be configured or verified during onboarding:
 No email provider credentials or secrets are entered into the browser
 during this step.
 
-**14. Setup Complete**
+
+**15. Setup Complete**
 
 The completion summary should display only the setup steps actually
 completed. Skipped steps should not be shown as completed.
@@ -647,33 +992,61 @@ Screen:
 
 **You're ready to go.**
 
-✓ Workspace created
+✓ Organization details saved
 
-✓ Products/services added
+✓ Managers, Team Leads, teams and Salespersons created
 
-✓ Team invited
+✓ Insurance catalogue started
 
-✓ Reminder preferences saved
+✓ Reminder defaults saved
+
+✓ WhatsApp connected
 
 ✓ Email sender configured
 
 **\[ Go to Dashboard \]**
 
+Setup is complete once the hierarchy is valid. Catalogue, WhatsApp and
+Email steps may be finished later without blocking normal CRM use.
+
 Avoid lengthy tutorials.
 
-**15. Dashboard — Purpose**
+
+**16. Dashboard — Purpose**
 
 The dashboard should answer:
 
 > **What needs my attention today?**
 
-and for managers:
+and, for supervisory roles:
 
-> **How is the business/team performing?**
+> **How is the part of the organization I am responsible for
+> performing?**
+
+What "the part of the organization I am responsible for" means depends
+on the role: the whole organization for an Admin, one reporting branch
+for a Manager, one team for a Team Lead, and the user's own work for a
+Salesperson.
 
 It should **not** attempt to display every possible CRM metric.
 
-**16. Dashboard — Admin / Manager Version**
+
+**17. Dashboard — Role Versions**
+
+There is one dashboard design with four role-scoped versions: Admin,
+Manager, Team Lead and Salesperson.
+
+Every figure, widget, list and activity row on every version is limited
+to the viewer's permitted scope under Section 2.3. Supervisory totals
+are hierarchical roll-ups and do not imply that the supervisor owns the
+underlying records.
+
+Admin and Manager versions are defined below. Team Lead and Salesperson
+versions are defined in Section 23.
+
+## 17.1 Admin Dashboard — Organization-Wide
+
+The Admin dashboard covers the whole organization.
 
 **Dashboard**
 
@@ -699,13 +1072,70 @@ It should **not** attempt to display every possible CRM metric.
 
 **───────────────────────────────────────────────────────**
 
+**Performance by Manager**
+
+**───────────────────────────────────────────────────────**
+
 **Recent Activity**
 
-**17. Dashboard Summary Cards**
+An Admin may narrow the dashboard by Manager, team, Team Lead or
+Salesperson. Narrowing is a filter over data the Admin can already see.
+It is not a permission change.
+
+## 17.2 Manager Dashboard — Reporting Branch
+
+The Manager dashboard covers only that Manager's own reporting
+hierarchy: their Team Leads, those Team Leads' teams, and the records
+belonging to them.
+
+**Dashboard**
+
+**\[ Date range / Today \]**
+
+**───────────────────────────────────────────────────────**
+
+**New Leads Follow-ups Today Renewals Due Soon Overdue Actions**
+
+**───────────────────────────────────────────────────────**
+
+**Today's Follow-ups**
+
+**───────────────────────────────────────────────────────**
+
+**Upcoming Renewals & Reminders**
+
+**───────────────────────────────────────────────────────**
+
+**Lead Pipeline**
+
+**───────────────────────────────────────────────────────**
+
+**Performance by Team**
+
+**───────────────────────────────────────────────────────**
+
+**Recent Activity**
+
+A Manager may narrow the dashboard by team, Team Lead or Salesperson
+within their own hierarchy.
+
+A Manager must not see another Manager's branch, and must not be offered
+a filter, comparison, benchmark or total that would reveal it. An
+organization-wide figure must not be shown to a Manager, including as a
+denominator, percentage or ranking position.
+
+A Manager's totals are roll-ups across their branch. A Manager does not
+own any of the underlying records.
+
+
+**18. Dashboard Summary Cards**
+
+Every card counts only records within the viewer's permitted scope, as
+defined in Section 2.3. The same card shows a different number to an
+Admin, a Manager, a Team Lead and a Salesperson, and that is correct
+behaviour rather than an inconsistency.
 
 **Card 1 — New Leads**
-
-Visible only if Leads are enabled.
 
 Shows:
 
@@ -723,9 +1153,9 @@ Click → Follow-ups → Today.
 
 **Card 3 — Renewals Due Soon**
 
-Shows services/records with upcoming renewal or due dates.
+Shows Customer Purchases with an upcoming Renewal Date.
 
-Due Soon represents renewals or due dates within the next 30 days.
+Due Soon represents a Renewal Date within the next 30 days.
 
 Click → Renewals & Reminders → Due Soon.
 
@@ -738,7 +1168,12 @@ clicking 2 Follow-ups → Follow-ups → Overdue
 
 clicking 3 Renewals → Renewals → Overdue
 
-**18. Today's Follow-ups Widget**
+Drill-down from a card must apply the same scope as the card itself. A
+user must never reach a record through a card that they could not reach
+through the corresponding list screen.
+
+
+**19. Today's Follow-ups Widget**
 
 Display approximately 5–8 upcoming items.
 
@@ -758,7 +1193,7 @@ Priya Iyer
 
 Related To
 
-Health Insurance
+Family Health Optima
 
 Follow-up Type
 
@@ -772,9 +1207,16 @@ Status
 
 Due
 
+**Related To** identifies the Plan/Sub-product or Product Category the
+follow-up concerns, where one applies.
+
+The widget shows only follow-ups within the viewer's authorized scope
+under Section 2.3. A Salesperson sees their own; a Team Lead their own
+and their team's; a Manager their branch; an Admin the organization.
+
 Actions:
 
-**Call** — shown for Call-type follow-ups, subject to Sections 27.1–27.5
+**Call** — shown for Call-type follow-ups, subject to Sections 29–33
 
 **Mark Complete**
 
@@ -783,58 +1225,72 @@ Actions:
 Selecting **Call** opens the phone's native calling interface. It does
 not mark the Follow-up complete; completion remains an explicit action.
 
-Selecting **customer/lead** opens the record.
+Selecting the person opens the related Lead or Customer.
 
-**View All** — opens the main Follow-ups screen, where the user can view
-all follow-ups permitted for their role.
+**View All** — opens the main Follow-ups screen, showing the follow-ups
+within that user's authorized scope.
+**20. Upcoming Renewals & Reminders Widget**
 
-**19. Upcoming Renewals & Reminders Widget**
-
-Display closest upcoming records.
+Display the closest upcoming Customer Purchase renewals.
 
 Example:
 
 **Customer**
 
-**Product/Service**
+**Plan / Sub-product**
 
-**Due**
+**Provider**
+
+**Renewal Date**
 
 **Reminder**
 
 Ramesh Kumar
 
-Health Insurance
+Family Health Optima
 
-4 days
+Star Health
+
+in 4 days
 
 Sent
 
 John Mathew
 
-PUC Certificate
+Two-Wheeler Package
 
-7 days
+Acme General
+
+in 7 days
 
 Scheduled
 
-ABC Stores
+Priya Nair
 
-AMC
+Secure Shield
 
-11 days
+Star Health
+
+in 11 days
 
 Not Scheduled
 
+Renewals shown are those for Customer Purchases within the viewer's
+authorized scope under Section 2.3, so the widget legitimately shows
+different rows to an Admin, a Manager, a Team Lead and a Salesperson.
+
+A reminder shown as **Sent** means the send succeeded. A failed or
+skipped reminder must never be displayed as Sent. See Sections 108 and
+134.
+
 Actions:
 
-**Open Customer/Service**
+**Open Customer**
+
+**Open Customer Purchase**
 
 **View All**
-
-**20. Lead Pipeline Widget**
-
-Only if Leads are enabled.
+**21. Lead Pipeline Widget**
 
 Simplified visual:
 
@@ -847,14 +1303,50 @@ and remain accessible through the Leads module and reports.
 
 Clicking a stage opens Leads filtered by that stage.
 
-Pipeline stages are configurable by the workspace administrator.
+The widget counts only Leads within the viewer's permitted scope under
+Section 2.3, so the same widget legitimately shows different numbers to
+an Admin, a Manager, a Team Lead and a Salesperson.
+
+**Priority**
+
+The widget should also convey Lead Priority, for example as a breakdown
+of the Leads in each stage:
+
+**Interested · 7**
+
+**Hot 3 · Warm 3 · Cold 1**
+
+Priority is a separate dimension from stage. It must not be shown as an
+additional pipeline column, and selecting a priority must not move a
+Lead between stages.
+
+Pipeline stages are configurable by Admin, as are Lead Priority values.
 Advanced forecasting and weighted pipeline values are outside V1.
 
-**21. Recent Activity Widget**
+
+**22. Recent Activity Widget**
 
 Purpose:
 
-Show important recent CRM actions.
+Show important recent CRM actions within the viewer's permitted scope.
+
+**Scope**
+
+The activity feed is scoped by the reporting hierarchy defined in
+Section 2.3:
+
+> • Admin sees activity from across the organization.
+>
+> • A Manager sees activity from their own reporting hierarchy only.
+>
+> • A Team Lead sees their own activity and that of the Salespersons in
+> their team.
+>
+> • A Salesperson sees their own activity only.
+
+A peer Manager's branch and a peer Team Lead's team must never appear in
+the feed, including indirectly through a counted total, a truncated
+preview or a "and 4 others" summary.
 
 Examples:
 
@@ -872,19 +1364,75 @@ Examples:
 
 **Yesterday**
 
-**Admin imported 124 customers.**
+**124 customers imported.**
+
+Each row should identify the user who performed the action, so that a
+supervisor can see who did what. Showing a supervisor an activity row
+does not make them the owner of the related record.
 
 Do not show every field edit.
 
 Only meaningful activity.
 
-**22. Staff Dashboard**
 
-A normal Staff/Sales user should see a more personal dashboard.
+**23. Operational Dashboards**
+
+Team Lead and Salesperson dashboards prioritise the user's own work.
+Both follow the scope rules in Section 2.3.
+
+## 23.1 Team Lead Dashboard
+
+A Team Lead is both an operational user and the supervisor of one team.
+The dashboard must serve both, and must keep them visually distinct so
+the Team Lead can tell their own work from their team's.
 
 **Dashboard**
 
 **Good morning, Arun**
+
+**MY WORK**
+
+**Follow-ups Today Overdue My Leads Renewals Due**
+
+**────────────────────────────────**
+
+**MY TEAM**
+
+**Team Follow-ups Due Team Overdue Unassigned in Team**
+
+**────────────────────────────────**
+
+**Today's Follow-ups**
+
+**────────────────────────────────**
+
+**Team Activity**
+
+**────────────────────────────────**
+
+**My Upcoming Renewals**
+
+Scope:
+
+> • **MY WORK** covers records the Team Lead personally owns or is
+> assigned.
+>
+> • **MY TEAM** covers the Team Lead's own records together with those
+> of the Salespersons in their team.
+>
+> • No data from another Team Lead's team appears, in any widget, total
+> or activity row.
+
+Team totals are a roll-up across the team. They do not imply that the
+Team Lead personally owns the underlying records.
+
+## 23.2 Salesperson Dashboard
+
+A Salesperson sees only their own operational work.
+
+**Dashboard**
+
+**Good morning, Sneha**
 
 **MY WORK**
 
@@ -906,18 +1454,28 @@ A normal Staff/Sales user should see a more personal dashboard.
 
 **────────────────────────────────**
 
-**Recent Customer Activity**
+**My Recent Customer Activity**
 
-No organization-wide revenue/team-performance data unless permissions
-allow it.
+Scope:
 
-**23. Dashboard Empty States**
+> • Only records assigned to that Salesperson appear.
+>
+> • No team, branch or organization-wide totals are shown.
+>
+> • No peer Salesperson's records or activity are shown, including
+> Salespersons in the same team.
 
-**Brand-new workspace**
+A Salesperson's own performance figures may be shown to that Salesperson.
+Comparative team or organization figures are not shown at this level.
+
+
+**24. Dashboard Empty States**
+
+**New installation**
 
 Instead of blank charts:
 
-**Welcome to your CRM**
+**Welcome to the A&S Fincare CRM**
 
 **Start by adding your first customer or importing**
 
@@ -927,9 +1485,10 @@ Instead of blank charts:
 
 **\[ Import Customers \]**
 
-If Leads are enabled:
+**\[ Add Lead \]**
 
-**Add Lead** may also appear.
+The actions offered must be ones the signed-in user's role can actually
+perform.
 
 **No follow-ups today**
 
@@ -943,7 +1502,19 @@ If Leads are enabled:
 
 **No renewals or reminders coming up.**
 
-Renewal dates will appear here once they are added to customer services.
+Renewal dates will appear here once they are added to customer
+purchases.
+
+**Nothing visible at this level**
+
+A supervisory dashboard may be legitimately empty because no team below
+the viewer has activity yet. In that case explain the scope rather than
+implying the organization has no data:
+
+**No activity in your teams yet.**
+
+An empty state must never reveal the existence, size or activity of
+records outside the viewer's permitted scope.
 
 **WhatsApp not connected**
 
@@ -951,15 +1522,16 @@ When WhatsApp is not connected, WhatsApp-related areas should show:
 
 **WhatsApp isn't connected yet.**
 
-**Connect your business WhatsApp account to**
+**Connect the A&S Fincare WhatsApp account to**
 
 **send customer reminders.**
 
 **\[ Connect WhatsApp \]**
 
-Visible to authorized roles only.
+Visible to Admin only.
 
-**24. Dashboard Loading / Error States**
+
+**25. Dashboard Loading / Error States**
 
 **Loading**
 
@@ -982,7 +1554,7 @@ Do not block the entire dashboard.
 Do not display widgets a user does not have permission to view rather
 than showing numerous "access denied" panels.
 
-**25. Dashboard Responsive Behaviour**
+**26. Dashboard Responsive Behaviour**
 
 **Desktop**
 
@@ -1019,14 +1591,16 @@ Below the summary, show **Today's Follow-ups** and **Upcoming Renewals**
 as touch-friendly cards/lists with the most relevant information and
 quick actions.
 
+Every figure and list on the mobile dashboard is scoped by the viewer's
+position in the hierarchy, exactly as on desktop. A smaller screen never
+widens what a user can see.
+
 Use bottom navigation for frequently used modules:
 
 **Home \| Leads \| Customers \| WhatsApp \| More**
 
-If Leads are disabled, replace Leads with Follow-ups.
-
-**More** provides access to Renewals & Reminders and other permitted
-modules.
+**More** provides access to Renewals & Reminders, Reports and other
+screens available to that role.
 
 Desktop tables should not simply be compressed on mobile. Where
 necessary, convert them into readable cards or list rows containing the
@@ -1041,23 +1615,37 @@ standalone display removes the browser's own interface, the layout must
 respect device safe areas so that navigation and content are not
 obscured by a notch, rounded corner or home indicator.
 
-**26. Global Record Ownership**
 
-**Record Owner** = the staff member primarily responsible for the
-overall Lead or Customer relationship.  
-**Assigned To** = the staff member responsible for completing a specific
-Follow-up, Renewal action or WhatsApp conversation.
+**27. Global Record Ownership**
+
+**Record Owner** = the Team Lead or Salesperson primarily responsible
+for the overall Lead or Customer relationship.
+
+**Assigned To** = the Team Lead or Salesperson responsible for
+completing a specific Follow-up, Renewal action or WhatsApp
+conversation.
 
 Lead and Customer records use **Record Owner**.  
 Follow-ups, Renewal actions and WhatsApp conversations use **Assigned
 To**.
 
+Only Team Leads and Salespersons may be a Record Owner or an operational
+Assigned To user. Admins and Managers must never be selectable in either
+field. The full ownership model, including the distinction between
+ownership and visibility, is defined in Section 2.5.
+
 By default, operational actions may inherit the related Lead/Customer's
-Record Owner, but they can be reassigned by authorized users.
+Record Owner, but they can be reassigned by an authorized user within
+the limits of the reporting hierarchy defined in Section 2.3.
 
-**27. Global Activity Timeline**
+Reassignment does not transfer ownership to the supervisor who performed
+it.
 
-Lead and Customer screens should use a common activity pattern.
+
+**28. Global Activity Timeline**
+
+Lead, Customer and Customer Purchase screens should use a common activity
+pattern.
 
 Activity types:
 
@@ -1065,11 +1653,13 @@ Activity types:
 >
 > • note
 >
-> • call — a user-confirmed call outcome, defined in Section 27.4
+> • call — a user-confirmed call outcome, defined in Section 32
 >
 > • visit
 >
 > • WhatsApp message
+>
+> • WhatsApp conversation assigned or reassigned
 >
 > • Email sent / failed
 >
@@ -1079,23 +1669,37 @@ Activity types:
 >
 > • stage changed
 >
-> • assignment changed
+> • priority changed
+>
+> • assignment or reassignment, naming who performed it and who received
+> the record
+>
+> • Record Owner changed
 >
 > • customer converted
 >
-> • service added
+> • Customer Purchase created
+>
+> • required policy document uploaded, replaced or removed
+>
+> • Customer Purchase marked `Closed/Active`
+>
+> • Closed Amount recorded or changed
+>
+> • renewal reminder sent, failed or skipped
 >
 > • renewal completed
->
-> • document uploaded
+
+Stage changes and priority changes are separate, clearly distinguishable
+events. Neither is described as the other.
 
 Example:
 
 **Today · 11:22 AM**
 
-**WhatsApp message sent**
+**WhatsApp renewal reminder sent**
 
-**"Your certificate expires on 08 September..."**
+**Family Health Optima · Star Health**
 
 **Yesterday · 4:15 PM**
 
@@ -1107,7 +1711,21 @@ Example:
 
 **Renewal reminder scheduled.**
 
-## 27.1 One-Tap Click-to-Call
+**Visibility**
+
+The timeline shows only activity within the viewer's authorized scope
+under Section 2.3. A supervisor seeing an activity row does not become
+the owner of the related record; the row identifies who performed the
+action.
+
+**Relationship to audit history**
+
+The activity timeline is the user-facing, readable history of a record.
+It is not the audit trail. Sensitive actions are additionally recorded in
+the append-only audit history defined in Section 208, which retains
+actor, timestamp, previous value and new value. The timeline may present
+a friendlier summary of the same event.
+**29. One-Tap Click-to-Call**
 
 An authorized user with access to a Lead or Customer may initiate a
 telephone call from the relevant CRM screen.
@@ -1117,7 +1735,7 @@ supported phone invokes the device's native calling interface using the
 valid normalized telephone number through a `tel:` link. The cellular
 conversation itself takes place in the phone's native call interface,
 which temporarily takes over from the CRM. A true in-app VoIP system is
-outside V1 and is excluded in Section 27.5.
+outside V1 and is excluded in Section 33.
 
 **Where Call must be available**
 
@@ -1153,7 +1771,7 @@ outside V1 and is excluded in Section 27.5.
 Phone numbers used for calling should be normalized for the `tel:` link
 while retaining user-friendly formatting when displayed in the CRM.
 
-## 27.2 Mobile Call and Return Flow
+**30. Mobile Call and Return Flow**
 
 The flow is:
 
@@ -1192,7 +1810,7 @@ The flow is:
 - The PWA must not claim to know the call duration unless a future
   approved telephony integration provides reliable information.
 
-## 27.3 Record Call Outcome
+**31. Record Call Outcome**
 
 **Record Call Outcome** is a small form used to log what actually
 happened on a call.
@@ -1252,21 +1870,21 @@ Optional
 - record the selected outcome
 - preserve the optional note
 - reference the originating Follow-up when applicable
-- preserve tenant isolation and record-access permissions
+- enforce the hierarchy-based access control defined in Section 2.3
 
 Saving a call outcome must not automatically change the Lead stage or
 the Customer status.
 
 When the user selects **Complete Follow-up** or **Complete and Schedule
 Next**, the existing Follow-up completion and scheduling rules defined
-in Section 41 are reused. A separate completion workflow must not be
+in Section 47 are reused. A separate completion workflow must not be
 introduced.
 
 If the selected outcome is **Call Back Requested**, the interface should
 make **Schedule Next Follow-up** prominent but must not silently
 schedule one.
 
-## 27.4 Call Activity Rules
+**32. Call Activity Rules**
 
 A Call activity represents a user-confirmed call outcome, not merely a
 tap on the **Call** button.
@@ -1275,26 +1893,29 @@ The activity timeline should show:
 
 - call outcome
 - related Lead or Customer
-- salesperson
+- the user who logged the outcome
 - date and time
 - note, when provided
 - originating Follow-up, when applicable
 
 Historical Call activities must remain available even if the related
-user, phone number or configuration is later changed.
+user, phone number, team or configuration is later changed.
 
 **Permissions**
 
-- Call activities are subject to the same workspace isolation, ownership
-  visibility and role permissions as the related Lead or Customer.
-- A Staff user may call and log outcomes only for records they are
-  permitted to access.
-- Admin and Manager visibility must follow the existing record-access
-  rules.
+- Call activities are subject to the same hierarchy-based access
+  control, ownership visibility and fixed role behaviour as the related
+  Lead or Customer. See Sections 2.3 and 2.5.
+- A Team Lead or Salesperson may call and log outcomes only for records
+  they are permitted to access.
+- Admin and Manager visibility of Call activities follows the reporting
+  hierarchy. Viewing a Call activity does not make a supervisor the
+  owner of the related record.
 - Hiding a **Call** button is not sufficient authorization. Access must
   also be enforced server-side where call outcomes are saved.
 
-## 27.5 V1 Call Limitations
+
+**33. V1 Call Limitations**
 
 V1 does not include:
 
@@ -1316,19 +1937,29 @@ V1 does not include:
 These capabilities may only be evaluated as a separately approved future
 integration.
 
-**28. Global Confirmation Rules**
+**34. Global Confirmation Rules**
 
 Not every action needs a confirmation modal.
 
 **Require confirmation for:**
 
-> • delete/archive record
+> • archive record
 >
-> • bulk delete
+> • bulk archive
 >
 > • convert lead
 >
+> • mark a Customer Purchase `Closed/Active`
+>
+> • remove or replace a required policy document
+>
 > • deactivate user
+>
+> • change a user's role
+>
+> • change a team's Team Lead or reporting Manager
+>
+> • assign an unassigned WhatsApp conversation
 >
 > • bulk send WhatsApp
 >
@@ -1336,9 +1967,9 @@ Not every action needs a confirmation modal.
 >
 > • cancel scheduled bulk messages
 >
-> • disable Email
->
 > • change or remove the verified Email sender
+>
+> • change incentive rules or slabs
 >
 > • major data import
 >
@@ -1350,18 +1981,26 @@ Not every action needs a confirmation modal.
 >
 > • change filter
 >
-> • change Record Owner / Assigned To
+> • change Lead Priority
+>
+> • change Record Owner / Assigned To within the user's permitted scope
 >
 > • mark normal follow-up complete
 >
 > • send an individual Email from a permitted record
+>
+> • upload a policy document
 >
 > • save standard field edits
 
 Where possible, provide **Undo** after lightweight actions instead of
 confirmation dialogs.
 
-**29. Global Record Deletion**
+A confirmation must explain the consequence rather than showing a
+generic **Are you sure?**. Where an action changes who can see existing
+records — for example moving a team to another Manager — the
+confirmation must say so.
+**35. Global Record Deletion**
 
 V1 uses Archive rather than permanent Delete for core CRM records.
 
@@ -1383,28 +2022,40 @@ Archived records:
 
 This reduces accidental data loss.
 
-**30. Lead Management**
+**36. Lead Management**
 
-Lead Management is used by businesses that handle enquiries or prospects
-before they become customers.
-
-The entire Leads module is hidden when Lead Management is disabled for
-the workspace.
+Lead Management handles enquiries and prospects before they become
+customers. It is part of V1 and is always available.
 
 The basic flow is:
 
-Lead → Assign → Follow-up → Update Stage → Won → Convert to Customer
+Lead → Assign → Follow-up → Update Stage → Won → Convert to Customer →
+Customer Purchase
 
 or
 
 Lead → Assign → Follow-up → Update Stage → Lost → Closed.
 
-**31. Leads — List View**
+Two independent attributes describe a Lead at all times:
+
+> • **Stage** — where the Lead has reached in the sales process.
+>
+> • **Priority** — how urgent or promising the Lead is, initially Hot,
+> Warm or Cold.
+
+They are separate fields. Changing one never changes the other, and
+neither is a substitute for the other. See Sections 40 and 192.
+
+Leads are owned by a Team Lead or Salesperson and are visible according
+to the reporting hierarchy in Section 2.3.
+
+
+**37. Leads — List View**
 
 **Purpose**
 
-Provide a searchable and filterable view of all leads the user is
-permitted to access.
+Provide a searchable and filterable view of the Leads the user is
+permitted to access under Section 2.3.
 
 **Header**
 
@@ -1432,6 +2083,10 @@ Phone
 
 98765 43210
 
+Priority
+
+Hot
+
 Interested In
 
 Health Insurance
@@ -1443,6 +2098,10 @@ Interested
 Record Owner
 
 Arun
+
+Team
+
+Kochi Health Team
 
 Next Follow-up
 
@@ -1456,8 +2115,11 @@ Actions
 
 ⋯
 
+**Priority** and **Stage** are separate columns. Neither substitutes for
+the other, and the list must not merge them.
+
 Phone and email information should be shown only according to the user's
-permissions.
+permitted scope.
 
 Selecting a Lead Name opens the Lead Detail screen.
 
@@ -1467,22 +2129,37 @@ Keep filtering simple.
 
 Available filters:
 
+> • Priority
+>
 > • Stage
 >
 > • Record Owner
 >
-> • Product / Service
+> • Team
+>
+> • Product Category / Plan
 >
 > • Follow-up Status
 >
 > • Created Date
 
+Record Owner and Team filter options are limited to those within the
+viewer's permitted scope. A filter list must never disclose users or
+teams the viewer cannot otherwise see.
+
+**Sorting**
+
+The list must support sorting by Priority, using the order Admin
+configured in Section 192, as well as by the usual date columns.
+
 Quick filters:
 
 **All \| My Leads \| Follow-up Due \| No Follow-up**
 
-For Staff users, **My Leads** should be the default view unless their
-permissions allow broader access.
+For a Salesperson, **All** and **My Leads** resolve to the same set,
+because a Salesperson sees only their own records. For a Team Lead,
+**All** means their team; for a Manager, their branch; for an Admin, the
+organization.
 
 **Search**
 
@@ -1494,11 +2171,15 @@ Search by:
 >
 > • Email
 
+Search results are limited to the viewer's permitted scope.
+
 **Row Actions**
 
 The ⋯ menu may contain:
 
 > • View Lead
+>
+> • Change Priority
 >
 > • Assign / Reassign
 >
@@ -1510,9 +2191,14 @@ The ⋯ menu may contain:
 >
 > • Archive
 
-Actions must follow role permissions.
+**Assign / Reassign** offers only Team Leads and Salespersons within the
+acting user's permitted scope, as defined in Section 55.
 
-**32. Add Lead**
+Actions must follow the fixed role behaviour in Section 2. Action-level
+decisions that remain open are listed in Section 188.
+
+
+**38. Add Lead**
 
 Selecting **+ Add Lead** opens an Add Lead form.
 
@@ -1529,11 +2215,15 @@ on the final UI design, but the fields and behaviour remain the same.
 >
 > • Email
 >
-> • Product / Service Interested In
+> • Priority — required
+>
+> • Interested In — Product Category or Plan/Sub-product
 >
 > • Lead Source
 >
 > • Stage
+>
+> • Team
 >
 > • Record Owner
 >
@@ -1544,17 +2234,32 @@ provided.
 
 **Default Values**
 
-> • Stage defaults to the first active pipeline stage. In the default
-> configuration this is **New.**
+> • **Priority** defaults to the configured default priority value. In
+> the initial configuration the active values are Hot, Warm and Cold.
+> Priority is a separate field from Stage and is never derived from it.
 >
-> • Record Owner defaults according to the workspace's lead assignment
-> rules.
+> • **Stage** defaults to the first active pipeline stage. In the
+> default configuration this is **New.**
 >
-> • If no automatic assignment rule is configured, the creator may
-> assign a user manually where permitted
+> • **Team** determines which team's round robin will assign the Lead.
+> The selectable teams are limited to those the acting user is permitted
+> to assign to under Section 2.3.
+>
+> • **Record Owner** is assigned by the selected team's round robin, as
+> defined in Section 189.1. The owner is always a Team Lead or
+> Salesperson from that team.
+>
+> • Where the acting user is permitted to choose the owner directly,
+> the selectable users are limited to the Team Leads and Salespersons
+> within their permitted scope. Admins and Managers are never
+> selectable.
+>
+> • If no eligible active recipient exists in the selected team,
+> assignment fails safely and the Lead may remain Unassigned against
+> that team. It is never given to an Admin, a Manager or a user from
+> another team.
 
-Custom Lead fields configured by the workspace should appear below the
-standard fields.
+Custom Lead fields appear below the standard fields. See Section 194.
 
 **Actions**
 
@@ -1585,20 +2290,29 @@ Show the matching record(s) and allow the user to:
 
 **View Existing Record**
 
-or, where permitted:
+or, where the acting user is permitted:
 
 **Create Anyway**
 
 The system should warn about duplicates rather than silently creating
 them.
 
-**33. Lead Pipeline View**
+Duplicate matching runs across the organization so that genuine
+duplicates are caught, but the matched record's details are disclosed
+only where the acting user is permitted to see that record under
+Section 2.3. Where they are not, the warning states that a matching
+record exists and offers to route the matter to an authorized
+supervisor, without revealing the record, its owner or its team.
+
+
+**39. Lead Pipeline View**
 
 Users should be able to switch between:
 
 **List \| Pipeline**
 
-The Pipeline view presents leads grouped by stage.
+The Pipeline view presents leads grouped by stage, within the viewer's
+permitted scope under Section 2.3.
 
 Example:
 
@@ -1616,13 +2330,23 @@ Each Lead card should show only useful summary information:
 
 > • Lead name
 >
-> • Product/service interest
+> • Priority
+>
+> • product interest
 >
 > • Record Owner
 >
 > • next follow-up, if scheduled
 >
 > • overdue indicator, if applicable
+
+Priority is shown on the card as its own indicator, separate from the
+column the card sits in. The column is the stage; the indicator is the
+priority.
+
+The board may be filtered or sorted by priority within each stage.
+Priority must not be used as a column, and a Lead must never be moved
+between stages in order to change its priority.
 
 **Stage Movement**
 
@@ -1636,6 +2360,8 @@ When a stage changes:
 > • record the change in Activity History
 >
 > • retain the previous stage in history
+>
+> • leave the Lead's priority unchanged
 
 Moving a Lead to **Won** should prompt the user to convert the Lead into
 a Customer.
@@ -1650,9 +2376,9 @@ Example:
 
 > • Not Interested
 >
-> • Price / Cost
+> • Premium / Cost
 >
-> • Chose Competitor
+> • Chose Another Provider
 >
 > • Unable to Contact
 >
@@ -1660,9 +2386,10 @@ Example:
 
 If **Other** is selected, allow a short note.
 
-**34. Pipeline Configuration**
 
-Pipeline stages are configurable by Owner/Admin users.
+**40. Pipeline Configuration**
+
+Pipeline stages are configurable by Admin.
 
 Default stages:
 
@@ -1695,20 +2422,32 @@ information from existing Leads.
 
 Complex stage automation is not part of V1.
 
-**35. Lead Detail Screen**
+**Stage is not priority**
+
+Pipeline stages and Lead Priority are configured separately and stored
+separately. Hot, Warm and Cold are **priority values, not pipeline
+stages**, and must never be added to the pipeline. Lead Priority
+configuration is defined in Section 192.
+
+Configuring pipeline stages and priority values is configurable business
+data. It does not change any role's visibility, ownership or
+authorization. See Section 2.6.
+
+
+**41. Lead Detail Screen**
 
 The Lead Detail screen is the central working screen for an individual
 Lead.
 
 Recommended structure:
 
-**Rajesh Menon Interested**
+**Rajesh Menon Hot Interested**
 
 **98765 43210**
 
 **rajesh@email.com**
 
-**Record Owner: Arun**
+**Record Owner: Arun · Kochi Health Team**
 
 **\[ WhatsApp \] \[ Email \] \[ Add Follow-up \] \[ Edit \] \[ More \]**
 
@@ -1724,11 +2463,20 @@ Recommended structure:
 
 **Activity & Notes**
 
-**36. Lead Header**
+The header shows **Priority** and **Stage** as two separate indicators.
+
+Authorized users may change priority directly from this screen. A
+priority change is recorded in the activity timeline and does not affect
+the Lead's stage.
+
+
+**42. Lead Header**
 
 Display:
 
 > • Lead Name
+>
+> • Priority
 >
 > • Stage
 >
@@ -1737,6 +2485,9 @@ Display:
 > • Email
 >
 > • Record Owner
+
+Priority and Stage are shown as distinct indicators. They must be
+visually separable and must never be combined into a single badge.
 
 Primary actions:
 
@@ -1761,14 +2512,14 @@ Primary actions:
 > • the device or environment can handle the telephone link
 
 Selecting **Call** follows the click-to-call behaviour defined in
-Sections 27.1–27.5. Initiating a call does not by itself create a Call
-activity or change the Lead stage.
+Sections 29–33. Initiating a call does not by itself create a Call
+activity or change the Lead stage or priority.
 
 WhatsAp**p** is enabled only when:
 
 > • a valid phone number exists
 >
-> • WhatsApp is connected for the workspace
+> • an active WhatsApp connection exists
 >
 > • the user has messaging permission
 
@@ -1779,9 +2530,7 @@ disabled/not-connected state rather than failing after selection.
 
 > • a valid email address exists
 >
-> • the Email module is enabled for the workspace
->
-> • the workspace has a verified sender
+> • a verified sender is configured
 >
 > • the user has permission to send email
 >
@@ -1790,7 +2539,8 @@ disabled/not-connected state rather than failing after selection.
 If Email is unavailable, the action should show the relevant
 disabled/not-configured state rather than failing after selection.
 
-**37. Lead Information**
+
+**43. Lead Information**
 
 Display the Lead's primary information.
 
@@ -1799,6 +2549,10 @@ Example:
 **Field**
 
 **Value**
+
+Priority
+
+Hot
 
 Interested In
 
@@ -1816,15 +2570,33 @@ Record Owner
 
 Arun
 
+Team
+
+Kochi Health Team
+
 Created
 
 29 Aug 2026
 
-Configured custom Lead fields should also appear here.
+**Priority** and **Stage** are separate fields and are displayed
+separately. Priority describes how urgent or promising the Lead is;
+Stage describes where it has reached in the sales process. Changing one
+never changes the other.
+
+**Interested In** may reference a Product Category or a specific
+Plan/Sub-product from the catalogue defined in Section 66. It is an
+expression of interest, not a purchase. A purchase is recorded only
+after conversion, as a Customer Purchase.
+
+Configured custom Lead fields also appear here. See Section 194.
 
 Authorized users can edit the information using **Edit Lead**.
 
-**38. Upcoming Follow-up**
+Changing the Record Owner offers only Team Leads and Salespersons within
+the acting user's permitted scope under Section 2.3.
+
+
+**44. Upcoming Follow-up**
 
 If an incomplete overdue Follow-up exists, show the earliest overdue
 item first. Otherwise show the nearest upcoming Follow-up.
@@ -1851,7 +2623,7 @@ Only the nearest upcoming incomplete follow-up needs to be highlighted
 here. Full follow-up history remains available in the activity timeline
 and Follow-ups module.
 
-**39. Lead Activity & Notes**
+**45. Lead Activity & Notes**
 
 Use the common activity timeline defined earlier.
 
@@ -1862,6 +2634,12 @@ Example:
 **Arun changed stage**
 
 Contacted → Interested
+
+**Today · 11:05 AM**
+
+**Arun changed priority**
+
+Warm → Hot
 
 **Today · 10:45 AM**
 
@@ -1875,7 +2653,21 @@ Contacted → Interested
 
 **29 Aug · 9:15 AM**
 
-**Lead created by Sneha.**
+**Lead created by Sneha and assigned to Arun.**
+
+Stage changes and priority changes are recorded as separate, clearly
+distinguishable events. One must never be described as the other.
+
+The timeline should also record:
+
+> • assignment and reassignment, naming who performed it and who
+> received the Lead
+>
+> • priority changes
+>
+> • stage changes
+>
+> • conversion to Customer
 
 Users may add a manual note using:
 
@@ -1891,7 +2683,11 @@ Notes should record:
 
 Notes form part of the Lead's permanent activity history.
 
-**40. Schedule Follow-up**
+These events are auditable. Detailed audit-history requirements are
+defined in Section 208.
+
+
+**46. Schedule Follow-up**
 
 A Follow-up may be created from:
 
@@ -1950,7 +2746,7 @@ Follow-up Type options in V1:
 
 A **Call Follow-up** is a task reminding the assigned user to telephone
 the Lead/Customer. Selecting **Call** from a Call Follow-up invokes the
-click-to-call flow defined in Sections 27.1–27.5. Scheduling the
+click-to-call flow defined in Sections 29–33. Scheduling the
 Follow-up does not automatically place a call, and initiating a call
 does not automatically complete the Follow-up.
 
@@ -1978,7 +2774,7 @@ After scheduling:
 >
 > • an activity entry is created
 
-**41. Completing a Follow-up**
+**47. Completing a Follow-up**
 
 Selecting **Mark Complete** opens a small completion form.
 
@@ -2015,12 +2811,12 @@ Completion of a Call Follow-up remains an explicit user action.
 Initiating a call from the Follow-up does not complete it.
 
 A completed Call Follow-up may store the call outcome selected in
-**Record Call Outcome** (Section 27.3). Where the user completes the
+**Record Call Outcome** (Section 31). Where the user completes the
 Follow-up from that form, the actions above are the same completion and
 scheduling rules — **Complete and Schedule Next** continues to use this
 workflow. A second completion process must not be introduced.
 
-**42. Reschedule Follow-up**
+**48. Reschedule Follow-up**
 
 Selecting **Reschedule** allows the user to change:
 
@@ -2046,7 +2842,7 @@ to Upcoming status.
 The system should not create a duplicate Follow-up merely because an
 existing one was rescheduled.
 
-**43. Main Follow-ups Screen**
+**49. Main Follow-ups Screen**
 
 The Follow-ups module combines follow-ups related to both Leads and
 Customers.
@@ -2099,11 +2895,16 @@ Actions
 >
 > • Customer
 
+For a Customer follow-up relating to a specific purchase, **Related To**
+should identify the Plan/Sub-product rather than only the category.
+
 Selecting the Person opens the related record.
 
 **Filters**
 
 > • Assigned To
+>
+> • Team
 >
 > • Follow-up Type
 >
@@ -2111,14 +2912,28 @@ Selecting the Person opens the related record.
 >
 > • Date Range
 
-Staff users should primarily see follow-ups assigned to them unless
-broader permissions are granted.
+**Visibility**
+
+The screen shows only follow-ups within the viewer's permitted scope
+under Section 2.3:
+
+> • a Salesperson sees follow-ups assigned to them
+>
+> • a Team Lead sees their own and those of the Salespersons in their
+> team
+>
+> • a Manager sees those in their own reporting hierarchy
+>
+> • an Admin sees the organization
+
+Assigned To and Team filter options are limited to users and teams
+within the viewer's permitted scope.
 
 **Actions**
 
 From the Follow-ups screen:
 
-> • Call — shown for Call-type follow-ups, subject to Sections 27.1–27.5
+> • Call — shown for Call-type follow-ups, subject to Sections 29–33
 >
 > • Mark Complete
 >
@@ -2133,7 +2948,8 @@ Primary action:
 
 **+ Add Follow-up**
 
-**44. Overdue Follow-ups**
+
+**50. Overdue Follow-ups**
 
 A Follow-up becomes **Overdue** when its scheduled date/time passes
 without being completed.
@@ -2149,13 +2965,13 @@ Overdue Follow-ups should:
 > • remain actionable using Mark Complete or Reschedule
 >
 > • for Call-type follow-ups, remain callable using Call, subject to
-> Sections 27.1–27.5
+> Sections 29–33
 
 The system should not automatically mark an overdue Follow-up as
 completed or cancelled. Initiating a call from an overdue Call
 Follow-up does not complete it.
 
-**45. Mark Lead as Won**
+**51. Mark Lead as Won**
 
 When a Lead is marked **Won**, show:
 
@@ -2173,7 +2989,15 @@ later.
 A **Convert to Customer** action should remain available from the Lead
 Detail screen until conversion is completed.
 
-**46. Convert Lead to Customer**
+Marking a Lead Won does not by itself record a sale, a Closed Amount or
+a Customer Purchase. Those are recorded against a Customer Purchase
+after conversion, as defined in Sections 67 and 68.3.
+
+Marking a Lead Won does not change its priority, and does not require
+any document.
+
+
+**52. Convert Lead to Customer**
 
 Before conversion, display a confirmation screen/modal summarising the
 information that will be carried forward.
@@ -2204,19 +3028,31 @@ Example:
 
 **\[ Cancel \]**
 
+**No documents are required to convert a Lead**
+
+A Lead may be converted into a Customer **without any policy
+documents**. Conversion is not gated on documents, on a Customer
+Purchase existing, or on any amount being recorded.
+
+Policy documents belong to a Customer Purchase and are required only to
+mark that purchase `Closed/Active`, as defined in Section 68.1. Nothing
+in the conversion flow may block on them.
+
 **After Conversion**
 
 The system should:
 
 > • Create a Customer using the Lead's information.
 >
-> • Retain the Lead's historical activity.
+> • Retain the Lead's historical activity, including its priority
+> history.
 >
 > • Link the original Lead and resulting Customer.
 >
 > • Carry forward incomplete future follow-ups.
 >
-> • Retain the Record Owner unless deliberately changed.
+> • Retain the Record Owner unless deliberately changed. The Record
+> Owner remains a Team Lead or Salesperson.
 >
 > • Mark the Lead as **Converted**.
 >
@@ -2229,7 +3065,20 @@ The system should:
 
 The original Lead should **not be deleted**.
 
-**47. Existing Customer During Conversion**
+**Recording what was sold**
+
+Conversion creates the Customer relationship only. What the Customer
+bought is recorded separately as a Customer Purchase.
+
+After conversion the system should offer, without requiring:
+
+**\[ Add Customer Purchase \]**
+
+A Customer may be created and left with no purchase. The Customer record
+is fully usable in that state.
+
+
+**53. Existing Customer During Conversion**
 
 If a Customer with the same phone number or email already exists, do not
 automatically create another Customer.
@@ -2257,7 +3106,24 @@ existing Customer, while historical Lead activities remain associated
 with the original Lead and accessible through the linked Customer
 history.
 
-**48. Mark Lead as Lost**
+**An existing Customer buying again**
+
+Linking a Lead to an existing Customer is the normal path when an
+existing Customer buys an additional product. The Customer record is not
+duplicated. Instead, the new sale is recorded as a **new Customer
+Purchase** against the existing Customer, as defined in Section 67.
+
+Each purchase is tracked independently, with its own Plan, policy
+number, documents, Closed Amount, status and renewal cycles. Adding one
+never alters an existing purchase.
+
+Linking does not change the existing Customer's Record Owner. If the new
+purchase should be owned by the user who worked the Lead, that is set on
+the Customer Purchase itself, which may have a different Record Owner
+from the Customer. Both must be a Team Lead or Salesperson.
+
+
+**54. Mark Lead as Lost**
 
 When marking a Lead as Lost:
 
@@ -2281,25 +3147,56 @@ A Lost Lead may later be reopened by an authorized user.
 Reopening returns the Lead to an active pipeline stage selected by the
 user.
 
-**49. Lead Assignment**
+**55. Lead Assignment**
 
-A Lead should receive a Record Owner according to the workspace's
-assignment rules. If assignment cannot be completed, the Lead may remain
-**Unassigned** until an authorized user assigns it.
+Every Lead has a **Record Owner**, who is always a **Team Lead or
+Salesperson**. Admins and Managers can never be a Lead's Record Owner.
+See Section 2.5.
 
-V1 supports manual assignment and round-robin assignment of the Record
-Owner.
+A Lead receives its Record Owner either by automatic team round robin or
+by manual assignment. Both are defined in Sections 189 and 189.1.
 
-Owner/Admin can configure the default assignment method in Settings.
+**Automatic assignment**
 
-Managers may reassign Leads where permitted.
+Automatic assignment is scoped to a single destination team. The
+eligible pool is that team's active Team Lead and active Salespersons.
+Admins, Managers, inactive users and users from other teams are never
+eligible recipients.
 
-Staff users should not normally reassign Leads to other users unless
-specifically permitted.
+If the destination team has no eligible active recipient, assignment
+fails safely: the Lead is not given to an Admin, a Manager or a user
+from another team, and the condition is surfaced rather than ignored.
+See Section 189.1.
 
-Every reassignment should appear in Activity History.
+**Manual assignment and reassignment**
 
-**50. Lead Archive**
+Authorized supervisors may assign or reassign a Lead, but only within
+their permitted hierarchy under Section 2.3:
+
+> • a Team Lead may assign or reassign within their own team
+>
+> • a Manager may assign or reassign within their own reporting
+> hierarchy
+>
+> • an Admin may assign or reassign anywhere in the organization
+
+A supervisor who performs an assignment does **not** become the Lead's
+owner. Assignment is a supervisory action; ownership stays with the
+Team Lead or Salesperson selected.
+
+Whether a Salesperson may reassign a Lead is *pending client
+confirmation before security implementation and UAT* and is listed in
+Section 188. It must not be assumed.
+
+If assignment cannot be completed, the Lead may remain **Unassigned**
+against its destination team until an authorized user assigns it.
+
+Every assignment and reassignment appears in Activity History and is an
+auditable action. Detailed audit-history requirements are defined in
+Section 208.
+
+
+**56. Lead Archive**
 
 Authorized users may archive a Lead.
 
@@ -2321,7 +3218,7 @@ active work views and retained in history.
 
 The user must confirm before proceeding.
 
-**51. Lead Management — Mobile Behaviour**
+**57. Lead Management — Mobile Behaviour**
 
 The mobile Lead experience should prioritise quick customer contact and
 follow-up actions.
@@ -2332,7 +3229,7 @@ Use card/list rows rather than the full desktop table.
 
 Each item should show:
 
-**Rajesh Menon**
+**Rajesh Menon · Hot**
 
 **Health Insurance**
 
@@ -2342,8 +3239,11 @@ Each item should show:
 
 **\[ Call \] \[ WhatsApp \]**
 
+Priority and stage are both shown and are visibly distinct. Priority is
+not a stage and must not be rendered as one.
+
 **Call** follows the click-to-call behaviour defined in Sections
-27.1–27.5. It opens the phone's native calling interface and does
+29–33. It opens the phone's native calling interface and does
 not by itself complete a Follow-up or create a Call activity.
 
 Selecting the card opens Lead Detail.
@@ -2355,11 +3255,14 @@ Keep primary actions easily accessible:
 **Call \| WhatsApp \| Email \| Follow-up \| More**
 
 **Call** follows the click-to-call behaviour defined in Sections
-27.1–27.5. It opens the phone's native calling interface and does
+29–33. It opens the phone's native calling interface and does
 not by itself complete a Follow-up or create a Call activity.
 
 Where the row or header cannot comfortably show every channel, Email may
 be placed under **More**. It must not be removed from mobile entirely.
+
+Changing Lead Priority must be possible from mobile, since Salespersons
+and Team Leads work primarily from a phone.
 
 Information and Activity sections should stack vertically.
 
@@ -2379,21 +3282,25 @@ Example:
 
 **Interested · 7**
 
-**Rajesh Menon**
+**Rajesh Menon · Hot**
 
 **Health Insurance**
 
 **Follow-up tomorrow**
 
-**Priya Iyer**
+**Priya Iyer · Warm**
 
-**Vehicle Insurance**
+**Motor Insurance**
 
 **No follow-up**
 
-This is more usable on a small screen.
+Priority may also be used to sort or filter within the selected stage.
 
-**52. Customer Management**
+Every mobile Lead view is scoped by the reporting hierarchy in
+Section 2.3, exactly as on desktop.
+
+
+**58. Customer Management**
 
 Customer Management is the central part of the CRM.
 
@@ -2405,20 +3312,29 @@ or
 
 **Add Customer Directly**
 
-A business does not need to use Leads in order to use Customers,
-Products/Services, Follow-ups, Renewals, WhatsApp or Email.
+A Customer records the relationship. What the Customer has actually
+bought is recorded separately, as one or more **Customer Purchases**.
 
 Basic customer lifecycle:
 
-Customer → Add Product/Service → Add Important/Due Date → Reminder →
-Renewal/Completion → New Due Date
+Customer → Add Customer Purchase → Upload Required Policy Documents →
+Mark `Closed/Active` → Renewal Reminder → Renewal / Completion → New
+Renewal Date
 
-**53. Customers — List View**
+A Customer may exist without any Customer Purchase, and may hold many
+purchases at once. Neither the Customer record nor the conversion that
+created it requires any document.
+
+Customers are owned by a Team Lead or Salesperson and are visible
+according to the reporting hierarchy in Section 2.3.
+
+
+**59. Customers — List View**
 
 **Purpose**
 
-Provide a searchable and filterable view of all Customers the user is
-permitted to access.
+Provide a searchable and filterable view of the Customers the user is
+permitted to access under Section 2.3.
 
 **Header**
 
@@ -2446,15 +3362,19 @@ Phone
 
 98470 12345
 
-Product / Service
+Purchases
 
-Health Insurance
+3
 
 Record Owner
 
 Arun
 
-Next Due Date
+Team
+
+Kochi Health Team
+
+Next Renewal Date
 
 26 Aug 2027
 
@@ -2466,10 +3386,9 @@ Actions
 
 ⋯
 
-If a Customer has multiple Products/Services, the table may show the
-nearest upcoming Product/Service or a count such as:
-
-**3 Services**
+The **Purchases** column shows how many Customer Purchases the Customer
+holds within the viewer's permitted scope. Where a Customer has one
+purchase, the Plan name may be shown instead of a count.
 
 Selecting the Customer Name opens the Customer Profile.
 
@@ -2477,18 +3396,31 @@ Selecting the Customer Name opens the Customer Profile.
 
 > • Record Owner
 >
-> • Product / Service
+> • Team
+>
+> • Product Category
+>
+> • Provider
+>
+> • Plan / Sub-product
+>
+> • Purchase Status
 >
 > • Renewal / Due Status
 >
 > • Created Date
 
+Record Owner and Team filter options are limited to those within the
+viewer's permitted scope. A filter list must never disclose users or
+teams the viewer cannot otherwise see.
+
 Quick filters:
 
-**All \| My Customers \| Due Soon \| Overdue \| No Upcoming Due Date**
+**All \| My Customers \| Due Soon \| Overdue \| No Upcoming Renewal**
 
-For Staff users, **My Customers** should be the default where their
-access is restricted to owned/permitted Customers.
+For a Salesperson, **All** and **My Customers** resolve to the same set,
+because a Salesperson sees only their own records. For a Team Lead,
+**All** means their team.
 
 **Search**
 
@@ -2500,8 +3432,7 @@ Search by:
 >
 > • Email
 >
-> • configured reference/identifier fields such as Policy Number,
-> Vehicle Number or Certificate Number
+> • policy or reference number
 
 **Row Actions**
 
@@ -2515,7 +3446,7 @@ The ⋯ menu may contain:
 >
 > • Add Follow-up
 >
-> • Add Product / Service
+> • Add Customer Purchase
 >
 > • WhatsApp
 >
@@ -2523,9 +3454,14 @@ The ⋯ menu may contain:
 >
 > • Archive
 
-Actions must follow role permissions.
+**Change Record Owner** offers only Team Leads and Salespersons within
+the acting user's permitted scope.
 
-**54. Add Customer**
+Actions must follow the fixed role behaviour in Section 2. Action-level
+decisions that remain open are listed in Section 188.
+
+
+**60. Add Customer**
 
 Selecting **+ Add Customer** opens the Customer form.
 
@@ -2537,7 +3473,7 @@ Selecting **+ Add Customer** opens the Customer form.
 >
 > • Email
 >
-> • Record Owner
+> • Record Owner — required
 >
 > • Address — optional
 >
@@ -2546,20 +3482,31 @@ Selecting **+ Add Customer** opens the Customer form.
 At least one contact method — **Phone Number or Email** — must be
 provided.
 
-Configured Customer custom fields should appear below the standard
-fields.
+Configured Customer custom fields appear below the standard fields. See
+Section 194.
 
-For Customers added directly, Record Owner defaults to the current user
-where applicable. Authorized users may select another active user.
+**Record Owner** must be a Team Lead or Salesperson. Admins and Managers
+are never selectable. The selectable users are limited to those the
+acting user is permitted to assign to under Section 2.3. See
+Section 2.5.
+
+For Customers added directly by a Team Lead or Salesperson, Record Owner
+defaults to the current user.
 
 Imported Customers may remain **Unassigned** when no valid Record Owner
 is mapped.
+
+**No documents are required to create a Customer.** Policy documents
+belong to a Customer Purchase and are required only to mark that
+purchase `Closed/Active`. See Section 68.1.
+
+A Customer may be created with no Customer Purchase.
 
 **Actions**
 
 **Save Customer**
 
-**Save & Add Product/Service**
+**Save & Add Customer Purchase**
 
 **Cancel**
 
@@ -2567,11 +3514,13 @@ is mapped.
 
 Creates the Customer and opens the Customer Profile.
 
-**Save & Add Product/Service**
+**Save & Add Customer Purchase**
 
-Creates the Customer and immediately opens the Add Product/Service form.
+Creates the Customer and immediately opens the Add Customer Purchase
+form.
 
-**55. Customer Duplicate Warning**
+
+**61. Customer Duplicate Warning**
 
 Before creating a Customer, check for an existing Lead or Customer with
 the same phone number or email.
@@ -2595,7 +3544,7 @@ creating a separate Customer.
 The system should warn about possible duplicates but should not
 automatically merge records.
 
-**56. Customer Profile**
+**62. Customer Profile**
 
 The Customer Profile is the central working screen for an existing
 Customer.
@@ -2606,9 +3555,9 @@ Recommended structure:
 
 **98470 12345 · ramesh@email.com**
 
-**Record Owner: Arun**
+**Record Owner: Arun · Kochi Health Team**
 
-**\[ WhatsApp \] \[ Email \] \[ Add Follow-up \] \[ Add Product/Service \]
+**\[ WhatsApp \] \[ Email \] \[ Add Follow-up \] \[ Add Customer Purchase \]
 \[ Edit \] \[ More \]**
 
 **────────────────────────────────**
@@ -2617,7 +3566,7 @@ Recommended structure:
 
 **────────────────────────────────**
 
-**Products & Services**
+**Customer Purchases**
 
 **────────────────────────────────**
 
@@ -2629,9 +3578,15 @@ Recommended structure:
 
 **────────────────────────────────**
 
-**Documents**
+**Policy Documents**
 
-**57. Customer Header**
+A Customer may exist with no Customer Purchase at all. In that case the
+Customer Purchases section shows its empty state and invites the owner
+to add one. Nothing about the Customer record is blocked by the absence
+of a purchase or of documents.
+
+
+**63. Customer Header**
 
 Display:
 
@@ -2642,6 +3597,8 @@ Display:
 > • Email
 >
 > • Record Owner
+>
+> • Team
 
 Primary actions:
 
@@ -2653,7 +3610,7 @@ Primary actions:
 
 **Add Follow-up**
 
-**Add Product/Service**
+**Add Customer Purchase**
 
 **Edit**
 
@@ -2668,7 +3625,7 @@ Primary actions:
 > • the device or environment can handle the telephone link
 
 Selecting **Call** follows the click-to-call behaviour defined in
-Sections 27.1–27.5. Initiating a call does not by itself create a Call
+Sections 29–33. Initiating a call does not by itself create a Call
 activity or change the Customer status.
 
 The WhatsApp action follows the same availability rules defined for
@@ -2680,10 +3637,10 @@ unavailable.
 The Email action follows the same availability rules defined for Leads.
 
 If the Customer has no valid email address, is marked **Email Opted
-Out**, or the workspace has no verified sender, Email should be
-unavailable.
+Out**, or no verified sender is configured, Email should be unavailable.
 
-**58. Customer Information**
+
+**64. Customer Information**
 
 Display standard Customer information and configured Customer custom
 fields.
@@ -2706,6 +3663,10 @@ Record Owner
 
 Arun
 
+Team
+
+Kochi Health Team
+
 Address
 
 Kochi
@@ -2716,132 +3677,231 @@ Customer Since
 
 Authorized users may edit this information using **Edit Customer**.
 
-Changes to Record Owner should be recorded in Activity History.
+The Record Owner may be changed only to another Team Lead or
+Salesperson the acting user is permitted to assign to under
+Section 2.3. Admins and Managers are never selectable.
 
-**59. Products & Services on Customer Profile**
+Changes to Record Owner are recorded in Activity History and are
+auditable. Changing the Customer's Record Owner does not automatically
+change the Record Owner of that Customer's existing purchases; those are
+changed individually, as described in Section 68.
 
-This section shows the Products/Services associated with the Customer.
+Configured Customer custom fields appear here. Custom fields are
+configurable business data and never affect who can see or own the
+record. See Section 194.
+
+
+**65. Customer Purchases on Customer Profile**
+
+This section lists the Customer Purchases belonging to the Customer. A
+Customer may have zero, one or many.
 
 Example:
 
-**Product / Service**
+**Plan / Sub-product**
 
-**Reference**
+**Provider**
+
+**Policy No.**
 
 **Status**
 
-**Next Due Date**
+**Documents**
 
-Health Insurance
+**Renewal Date**
+
+Family Health Optima
+
+Star Health
 
 STAR/FH/44120
 
-Active
+Closed/Active
+
+3 of 3
 
 26 Aug 2027
 
-Vehicle Insurance
+Secure Shield
 
-VH/83912
+Star Health
 
-Active
+STAR/SS/91204
+
+Not closed
+
+1 of 2
+
+—
+
+Two-Wheeler Package
+
+Acme General
+
+AG/TW/83912
+
+Closed/Active
+
+2 of 2
 
 11 Jan 2027
 
-AMC
-
-AMC-2218
-
-Expired
-
-01 Sep 2026
-
 Actions:
 
-**+ Add Product/Service**
+**+ Add Customer Purchase**
 
-Selecting a row opens the Customer Product/Service Detail.
+Selecting a row opens the Customer Purchase Detail.
 
-Each Customer may have multiple Products/Services.
+The **Documents** column shows required-document completeness. A
+purchase whose documents are incomplete cannot be marked `Closed/Active`
+and should make that visible at a glance.
 
-**60. Product / Service Definition**
+Each Customer Purchase is independent: it carries its own Provider,
+Plan, policy number, Closed Amount, documents, status, Record Owner and
+renewal cycles. A Customer who buys a further Plan gets a further
+Customer Purchase; existing purchases are not modified.
 
-Products/Services are configured by Owner/Admin users and represent what
-the business provides.
+The purchases shown are those the viewer is permitted to see under
+Section 2.3. Where a Customer's purchases are owned by different users,
+a viewer may see some and not others; the screen must not reveal the
+existence of purchases outside their scope.
 
-Examples:
 
-> • Health Insurance
+**66. Insurance Product Catalogue**
+
+The catalogue describes what A&S Fincare distributes. It has three
+levels, and a fourth concept that records an actual sale:
+
+> **1. Product Category** — the class of product.
+> Example: Health Insurance.
 >
-> • Vehicle Insurance
+> **2. Provider** — the insurer whose product it is.
+> Example: Star Health.
 >
-> • Pollution Certificate
+> **3. Plan / Sub-product** — the specific named product a customer can
+> buy. Example: Family Health Optima.
 >
-> • Vehicle Service
+> **4. Customer Purchase** — one specific Plan acquired by one Customer.
+> Example: Rajesh Menon's Family Health Optima policy.
+
+The names above are examples showing the shape of the data. They are not
+fixed or seeded values.
+
+**Relationships**
+
+> • A Product Category may contain Plans from multiple Providers.
 >
-> • AMC
+> • A Provider may offer multiple Plans, across more than one Product
+> Category.
 >
-> • Membership
+> • Each Plan belongs to exactly one Product Category and exactly one
+> Provider.
 >
-> • Training Course
+> • A Customer purchases a **Plan/Sub-product**, never a Product
+> Category and never a Provider on its own.
 
-These are reusable business-level definitions.
+Illustration:
 
-A Product/Service definition is different from a **Customer
-Product/Service Record**.
+**Catalogue**
 
-Example:
-
-**Business Product / Service**
-
-**Health Insurance**
+**Health Insurance** (Product Category)
 
 ↓
 
-**Customer Product / Service Record**
+**Star Health** (Provider)
 
-**Ramesh Kumar**
+↓
 
-**Health Insurance**
+**Family Health Optima** (Plan / Sub-product)
+
+↓
+
+**Customer Purchase**
+
+**Rajesh Menon**
+
+**Family Health Optima · Star Health**
 
 **Policy No: STAR/FH/44120**
 
 **Renewal Date: 26 Aug 2027**
 
-**61. Add Product / Service to Customer**
+**Closed Amount recorded · Status: Closed/Active**
 
-Selecting **Add Product/Service** creates a Customer Product/Service
-Record.
+**Catalogue rules**
+
+> • The catalogue is shared reference data maintained for A&S Fincare
+> and is administered by Admin. See Section 193.
+>
+> • Catalogue records are never the Record Owner or assignee of an
+> operational record.
+>
+> • Deactivating a catalogue record prevents future selection but must
+> not delete, alter or invalidate existing Customer Purchases, their
+> Closed Amount, their documents or their history.
+>
+> • Admin-defined custom fields are not available on catalogue records.
+> They apply only to Leads, Customers and Customer Purchases. See
+> Section 194.
+>
+> • The catalogue does not define provider integrations. V1 does not
+> connect to any provider system.
+
+
+**67. Add Customer Purchase**
+
+Selecting **Add Customer Purchase** creates a Customer Purchase: one
+specific Plan/Sub-product acquired by this Customer.
 
 **Fields**
 
-> • Product / Service — required
+> • Product Category — required
 >
-> • Reference Number — optional
+> • Provider — required
 >
-> • Start Date — optional
+> • Plan / Sub-product — required
 >
-> • Due / Renewal / Expiry Date — optional
+> • Policy / Reference Number — optional at creation
 >
-> • Amount — optional
+> • Start / Effective Date — optional
+>
+> • Renewal Date — optional
+>
+> • Closed Amount — recorded for a qualifying purchase
 >
 > • Status — required
 >
+> • Record Owner — required
+>
 > • Notes — optional
 
-Default Status options:
+Category, Provider and Plan are selected from the catalogue defined in
+Section 193. Selecting a Category narrows the Providers offered, and
+selecting a Provider narrows the Plans offered. Only active catalogue
+entries are selectable.
 
-> • Active
->
-> • Completed
->
-> • Expired
->
-> • Cancelled.
+The Customer purchases a **Plan/Sub-product**. It is not possible to
+record a purchase against a Product Category or a Provider alone.
+
+**Record Owner** defaults to the Customer's Record Owner and may be
+changed to another Team Lead or Salesperson the acting user is permitted
+to assign to. Admins and Managers are never selectable. See
+Section 2.5.
+
+Configured Customer Purchase custom fields appear below the standard
+fields. See Section 194.
+
+**Status at creation**
+
+A new purchase is created in a not-closed state. It cannot be created
+directly as `Closed/Active` unless its required policy documents are
+already complete. See Section 68.1.
 
 **Actions**
 
 **Save**
+
+**Save & Upload Documents**
 
 **Save & Add Reminder**
 
@@ -2849,40 +3909,68 @@ Default Status options:
 
 **Save**
 
-Creates the Customer Product/Service Record and returns to the Customer
-Profile.
+Creates the Customer Purchase and returns to the Customer Profile.
+
+**Save & Upload Documents**
+
+Creates the purchase and opens its required-document checklist, so the
+owner can complete the prerequisite for `Closed/Active`.
 
 **Save & Add Reminder**
 
-Creates the record and opens the Reminder configuration for its
-Due/Renewal date.
+Creates the purchase and opens the reminder configuration for its
+renewal date. If no renewal date has been entered, the user must enter
+one before creating a date-based reminder.
 
-If no Due/Renewal date has been entered, the user must enter one before
-creating a date-based reminder.
+**Repeat purchases**
 
-**62. Customer Product / Service Detail**
+An existing Customer may purchase an additional Plan/Sub-product at any
+time. Each one is created as its own Customer Purchase and is tracked
+independently, with its own documents, Closed Amount, status and renewal
+cycles. Adding a purchase never modifies an existing one.
+
+
+**68. Customer Purchase Detail**
 
 The detail view should show:
 
 > • Customer
 >
-> • Product / Service
+> • Product Category
 >
-> • Reference Number
+> • Provider
 >
-> • Start Date
+> • Plan / Sub-product
 >
-> • Due / Renewal / Expiry Date
+> • Policy / Reference Number
 >
-> • Amount
+> • Start / Effective Date
+>
+> • Renewal Date
 >
 > • Status
 >
+> • Closed Amount
+>
+> • Record Owner
+>
+> • Team
+>
+> • required policy documents and their completeness
+>
 > • notes
+>
+> • configured Customer Purchase custom fields
+>
+> • created and last-updated history
 
 Actions:
 
 **Edit**
+
+**Upload Documents**
+
+**Mark Closed/Active**
 
 **Add / Edit Reminder**
 
@@ -2890,44 +3978,253 @@ Actions:
 
 **Add Follow-up**
 
+**Change Record Owner**
+
 **Archive**
 
-The Customer name should link back to the Customer Profile.
+The Customer name links back to the Customer Profile.
 
-Archiving a Customer Product/Service removes it from active
-Product/Service and Renewal work views, cancels its future scheduled
-reminders, and retains its details, renewal history and activity.
+**Mark Closed/Active** is disabled while any required policy document is
+missing, and the interface explains which documents are outstanding. See
+Section 68.1.
+
+**Change Record Owner** offers only Team Leads and Salespersons the
+acting user is permitted to assign to under Section 2.3. Changing
+ownership is an auditable action and does not make the supervisor who
+performed it an owner.
+
+Archiving a Customer Purchase removes it from active purchase and
+renewal work views, cancels its future scheduled reminders, and retains
+its details, documents, Closed Amount, renewal history and activity.
 Authorized users may restore it.
 
-**63. Important Dates**
+## 68.1 Customer Purchase Status and `Closed/Active`
 
-Important dates are dates associated with a Customer Product/Service
-that require future action.
+**Statuses**
+
+> • **Draft / Not Closed** — the purchase has been recorded but is not
+> yet confirmed as closed. Required policy documents may still be
+> missing.
+>
+> • **`Closed/Active`** — the sale is closed and the policy is in force.
+> All required policy documents have been uploaded.
+>
+> • **Completed** — the purchase ran its course and was not renewed.
+>
+> • **Expired** — the renewal date passed without renewal or completion.
+>
+> • **Cancelled** — the purchase was cancelled.
+
+Existing status meanings are retained where they do not conflict with
+this model. `Closed/Active` is the status introduced by this
+specification and is the one that gates performance and incentive
+eligibility.
+
+**The document prerequisite**
+
+A Customer Purchase **cannot be marked `Closed/Active` until all of its
+required policy documents have been uploaded.**
+
+> • The system must show which required documents are present and which
+> are missing.
+>
+> • The **Mark Closed/Active** action must be unavailable while any
+> required document is missing, and must explain why rather than failing
+> silently or without reason.
+>
+> • The transition must be validated on the server. Hiding or disabling
+> the button in the interface is not sufficient.
+>
+> • No approval, review or sign-off follows the upload. Uploading the
+> required documents is by itself sufficient to satisfy the document
+> prerequisite.
+
+**What the document prerequisite does not mean**
+
+> • It does not apply to converting a Lead into a Customer. A Lead may
+> be converted with no documents at all. See Section 52.
+>
+> • It does not apply to creating a Customer. See Section 60.
+>
+> • It does not apply to creating a Customer Purchase. A purchase may be
+> created and worked on while its documents are incomplete.
+>
+> • Uploading documents does not imply that payment was received, that
+> the policy was issued by the provider, or that any other business
+> event occurred. Those are separate facts and must not be inferred.
+
+**Effect of `Closed/Active`**
+
+Once a purchase is `Closed/Active`, its Closed Amount becomes eligible
+for performance and incentive totals. See Section 68.3.
+
+**Pending client confirmation**
+
+These questions are collected in the consolidated register in
+Section 212.
+
+> • Whether a distinct intermediate status is required between creation
+> and `Closed/Active` is *pending client confirmation*. The names used
+> above should not be treated as final.
+>
+> • Cancellation, lapse, refund and reversal behaviour after a purchase
+> has reached `Closed/Active`, and the effect on already-counted Closed
+> Amount, is *pending client confirmation*.
+
+## 68.2 Required Policy Documents
+
+Each Customer Purchase carries a checklist of the policy documents
+required for it.
+
+The screen must show:
+
+> • each required document type
+>
+> • whether it is present or missing
+>
+> • the uploaded file, uploader and upload date where present
+>
+> • overall completeness, for example **2 of 3 uploaded**
+
+Example:
+
+**Required Documents — 2 of 3**
+
+✓ Policy schedule — uploaded by Arun, 01 Sep 2026
+
+✓ Proposal form — uploaded by Arun, 01 Sep 2026
+
+✗ Policy certificate — missing
+
+**\[ Upload \]**
+
+**Rules**
+
+> • Documents are uploaded against the Customer Purchase, not against
+> the Customer.
+>
+> • V1 covers **policy-related documents only**. Personal identity and
+> KYC documents are not part of this requirement.
+>
+> • Uploaded documents are retained for future reference and survive
+> archiving of the purchase or the Customer.
+>
+> • There is no approval or review queue.
+>
+> • Additional, non-required policy documents may also be uploaded. They
+> do not affect the completeness calculation.
+>
+> • Document access follows the reporting hierarchy in Section 2.3 and
+> is enforced server-side.
+>
+> • Uploads, replacements and removals are auditable actions.
+>
+> • Removing a required document returns the purchase to an incomplete
+> state. Whether this can occur after the purchase is already
+> `Closed/Active`, and what happens if it does, is *pending client
+> confirmation*.
+
+The administrative level at which the required-document list is defined
+is *pending client confirmation*, as described in Section 193.4. What is
+fixed is that each purchase resolves to a definite list and reports its
+completeness.
+
+## 68.3 Closed Amount
+
+**Closed Amount** is the value recorded against an individual Customer
+Purchase for a qualifying transaction.
+
+**Rules**
+
+> • Closed Amount belongs to the **Customer Purchase**. It is not stored
+> only at Customer level, and a Customer's total is derived from their
+> purchases rather than entered directly.
+>
+> • A Customer Purchase existing, or a Customer existing, does not by
+> itself make any amount eligible.
+>
+> • A Closed Amount becomes **eligible** for performance and incentive
+> totals only when both conditions hold:
+>
+> > 1. the required policy documents for that purchase are complete; and
+> >
+> > 2. the purchase is `Closed/Active`.
+>
+> • Each renewal cycle keeps its own Closed Amount. A new cycle's amount
+> does not overwrite the previous cycle's.
+>
+> • Changing a Closed Amount is an auditable action.
+
+**Roll-ups**
+
+Eligible Closed Amount aggregates upward through the hierarchy:
+
+> • a Salesperson's own total
+>
+> • a Team Lead's own personal total
+>
+> • the team total — the Team Lead's personal total plus the team's
+> Salespersons
+>
+> • a Manager's branch total
+>
+> • the organization total, visible to Admin
+
+A roll-up shown to a Team Lead, Manager or Admin does **not** mean that
+supervisor owns the underlying purchases. Managers and Admins never own
+purchases at all. See Section 2.5.
+
+**Terminology**
+
+Closed Amount is the transaction value recorded on a purchase. It is not
+itself revenue, commission or an incentive. Where this specification
+needs to refer to a calculated incentive, it says so explicitly. The
+incentive engine is defined in Section 206.
+
+**Pending client confirmation**
+
+These questions are collected in the consolidated register in
+Section 212.
+
+> • which Customer Purchases qualify for a Closed Amount
+>
+> • the effect on already-counted totals if a purchase is later
+> cancelled, lapses, is refunded or is reversed
+
+
+**69. Important Dates**
+
+Important dates are dates associated with a Customer Purchase that
+require future action.
 
 Examples:
 
-> • Policy renewal date
+> • policy renewal date
 >
-> • Certificate expiry date
+> • policy expiry date
 >
-> • AMC renewal date
+> • premium instalment due date
 >
-> • Next vehicle service date
->
-> • Membership expiry date
+> • free-look or cooling-off period end date
 
 For V1, the primary important date used by the Renewals & Reminders
-module is the Product/Service's **Due / Renewal / Expiry Date**.
+module is the Customer Purchase's **Renewal Date**.
 
-Additional custom date fields may be stored but should not automatically
-create reminders unless specifically configured as reminder dates.
+Additional date fields, including Customer Purchase custom date fields,
+may be stored but do not automatically create reminders unless
+specifically configured as reminder dates.
 
-**64. Renewals & Reminders — Main Screen**
+
+**70. Renewals & Reminders — Main Screen**
 
 **Purpose**
 
-Provide a central work view of Customer Products/Services approaching or
-past their Due/Renewal date.
+Provide a central work view of Customer Purchases approaching or past
+their renewal date.
+
+The list is scoped by the reporting hierarchy in Section 2.3: a
+Salesperson sees their own, a Team Lead their team's, a Manager their
+branch's, and an Admin the organization's.
 
 Recommended tabs:
 
@@ -2943,21 +4240,29 @@ Customer
 
 Ramesh Kumar
 
-Product / Service
+Plan / Sub-product
 
-Health Insurance
+Family Health Optima
+
+Provider
+
+Star Health
 
 Reference
 
 STAR/FH/44120
 
-Due Date
+Renewal Date
 
 26 Sep 2026
 
 Assigned To
 
 Arun
+
+Team
+
+Kochi Health Team
 
 Reminder Status
 
@@ -2973,31 +4278,51 @@ Actions
 
 Selecting the Customer opens the Customer Profile.
 
-Selecting the Product/Service opens its detail view.
+Selecting the Plan/Sub-product opens the Customer Purchase Detail.
 
-**65. Renewal / Reminder Assignment**
+Filters may include renewal window, Product Category, Provider, Plan,
+Assigned To and Team. The Assigned To and Team options are limited to
+those within the viewer's permitted scope.
+
+
+**71. Renewal / Reminder Assignment**
 
 A Renewal action uses **Assigned To**, not Record Owner.
 
-By default, the Renewal action should inherit the Customer's Record
-Owner.
+By default, the Renewal action inherits the Record Owner of the related
+Customer Purchase.
 
-Authorized users may reassign it.
+The Assigned To user must be a **Team Lead or Salesperson**. Admins and
+Managers can never be the assignee of a Renewal action. See Section 2.5.
+
+Authorized users may reassign it, within the limits of the reporting
+hierarchy in Section 2.3:
+
+> • a Team Lead may reassign within their own team
+>
+> • a Manager may reassign within their own reporting hierarchy
+>
+> • an Admin may reassign anywhere in the organization
 
 Example:
 
-**Customer**
+**Customer Purchase**
 
 **Record Owner: Arun**
 
-**Health Insurance Renewal**
+**Family Health Optima Renewal**
 
 **Assigned To: Sneha**
 
-Changing the Renewal action's Assigned To does not change the Customer's
-Record Owner.
+Changing the Renewal action's Assigned To does not change the Customer
+Purchase's Record Owner, and does not make the supervisor who performed
+the reassignment an owner of anything.
 
-**66. Renewal Status**
+Reassignment is an auditable action. Detailed audit-history requirements
+are defined in Section 208.
+
+
+**72. Renewal Status**
 
 Recommended V1 statuses:
 
@@ -3011,34 +4336,35 @@ Recommended V1 statuses:
 >
 > • Not Renewing
 
-Status is derived from the Due Date and user action.
+Status is derived from the Renewal Date and user action.
 
 **Upcoming**
 
-Due Date is in the future.
+Renewal Date is in the future.
 
 **Due Today**
 
-Due Date is today.
+Renewal Date is today.
 
 **Overdue**
 
-Due Date has passed and the item has not been marked Renewed/Completed
+Renewal Date has passed and the item has not been marked Renewed/Completed
 or Not Renewing.
 
 **Renewed / Completed**
 
-The business has completed the renewal/service action.
+A&S Fincare has completed the renewal action for this Customer
+Purchase.
 
 **Not Renewing**
 
-The Customer will not continue the Product/Service for the current
+The Customer will not continue this Customer Purchase for the current
 cycle.
 
-**67. Reminder Configuration**
+**73. Reminder Configuration**
 
-A reminder may be configured for a Customer Product/Service with a Due
-Date.
+A reminder schedule is configured for a **Customer Purchase** that has a
+renewal date.
 
 Example:
 
@@ -3058,28 +4384,33 @@ Example:
 
 ☑ **Email**
 
-Workspace default reminder settings should be preselected.
+Default reminder settings configured by Admin are preselected. See
+Section 195.
 
 Authorized users may adjust the reminder schedule for an individual
-Customer Product/Service.
+Customer Purchase.
+
+Renewal reminders are part of V1 and operate automatically once a
+renewal date and schedule exist. They are not an optional module. The
+automation rules are defined in Section 195.1.
 
 A WhatsApp reminder requires:
 
 > • a valid Customer phone number
 >
-> • WhatsApp connected for the workspace
+> • an active WhatsApp connection
 >
 > • an eligible/approved message template where required
+>
+> • the Customer not being marked WhatsApp Opted Out
 
-If WhatsApp cannot be used, the reminder should not silently fail.
+If WhatsApp cannot be used, the reminder must not silently fail.
 
 An Email reminder requires:
 
 > • a valid Customer email address
 >
-> • Email enabled for the workspace
->
-> • a verified workspace sender
+> • a verified sender
 >
 > • an active Email template
 >
@@ -3087,7 +4418,12 @@ An Email reminder requires:
 
 If Email cannot be used, the reminder must not silently fail.
 
-**68. Reminder Status**
+The schedules and channels shown above are illustrative. The schedules,
+channel preference and template content A&S Fincare will use are
+*pending client confirmation*.
+
+
+**74. Reminder Status**
 
 Where applicable, show a simple reminder status such as:
 
@@ -3101,7 +4437,7 @@ Where applicable, show a simple reminder status such as:
 >
 > • Cancelled
 
-For multiple reminders, the Product/Service detail may show the
+For multiple reminders, the Customer Purchase Detail may show the
 individual reminder history.
 
 Example:
@@ -3112,10 +4448,14 @@ Example:
 
 **1 day before Scheduled 25 Sep**
 
-**69. Send Reminder Manually**
+**75. Send Reminder Manually**
 
-From Renewals & Reminders, authorized users may send a reminder
-manually.
+From Renewals & Reminders, an authorized user may send a reminder
+manually for a Customer Purchase within their permitted scope.
+
+A manual reminder is an immediate send. It is separate from the
+automatic renewal reminders defined in Section 195.1, and sending one
+does not cancel or replace a scheduled reminder.
 
 Actions:
 
@@ -3129,7 +4469,7 @@ or
 
 **Create Follow-up**
 
-Sending a manual WhatsApp or Email reminder should use the applicable communication flow defined in the WhatsApp and Email sections.
+Sending a manual WhatsApp or Email reminder should use the applicable communication flow defined in the WhatsApp and Email sections, including their eligibility, template, consent and opt-out rules.
 
 A manual reminder should be recorded in:
 
@@ -3137,12 +4477,20 @@ A manual reminder should be recorded in:
 >
 > • Customer Activity
 >
-> • relevant Product/Service history
+> • the Customer Purchase's reminder history
 
-**70. Bulk Renewal Reminder**
+A failed manual send must be shown as failed, with the available reason.
+It must never be presented as successful.
 
-Authorized users may select multiple eligible records from the Renewals
-& Reminders screen.
+
+**76. Bulk Renewal Reminder**
+
+Authorized users may select multiple eligible Customer Purchases from
+the Renewals & Reminders screen.
+
+Selection is limited to the records within the acting user's permitted
+scope under Section 2.3. A user can never select, or send to, a record
+they cannot see.
 
 Available bulk action:
 
@@ -3183,23 +4531,31 @@ Example:
 **\[ Cancel \]**
 
 Bulk messaging must not imply unrestricted WhatsApp broadcasting. Only
-eligible messages should be sent.
+eligible messages should be sent, and Meta template, consent and opt-out
+rules continue to apply.
 
 Controlled bulk Email reminders follow the validation, review and result rules defined in the Email Communications section.
 
-**71. Mark Renewed / Completed**
+Which roles may send controlled bulk reminders is *pending client
+confirmation before security implementation and UAT* and is listed in
+Section 188.
 
-Selecting **Mark Renewed / Completed** opens a small form.
+
+**77. Mark Renewed / Completed**
+
+Selecting **Mark Renewed / Completed** on a Customer Purchase opens a
+small form.
 
 Fields:
 
 > • Completion / Renewal Date — default today
 >
-> • New Due / Renewal Date — optional
+> • New Renewal Date — optional
 >
-> • Reference Number — prefilled/editable if applicable
+> • Policy / Reference Number — prefilled, editable
 >
-> • Amount — optional
+> • Closed Amount for the new cycle — where the renewal represents a new
+> qualifying transaction
 >
 > • Note — optional
 
@@ -3209,17 +4565,17 @@ Actions:
 
 **Cancel**
 
-**If a New Due Date is entered**
+**If a New Renewal Date is entered**
 
-The current cycle is marked completed and the Product/Service remains
-active with the new Due Date.
+The current cycle is marked completed and the Customer Purchase remains
+active with the new renewal date.
 
-Future reminders are generated from the new Due Date according to the
-reminder configuration.
+Future reminders are generated from the new renewal date according to
+the reminder configuration.
 
 Example:
 
-**Old Due Date**
+**Old Renewal Date**
 
 **26 Aug 2026**
 
@@ -3231,17 +4587,35 @@ Example:
 
 ↓
 
-**New Due Date**
+**New Renewal Date**
 
 **26 Aug 2027**
 
-The previous Due Date and renewal event remain in history.
+The previous renewal date and the renewal event remain in the purchase's
+history.
 
-**72. Complete Without Another Due Date**
+**Renewal, documents and Closed Amount**
 
-Some services are completed once and do not require another renewal.
+> • Whether a renewal cycle requires its own policy documents before its
+> Closed Amount becomes eligible follows the same rule as the original
+> purchase: a cycle's Closed Amount becomes eligible for performance and
+> incentive totals only once the required documents for that cycle are
+> complete and the purchase is `Closed/Active`. See Sections 68.1–68.3.
+>
+> • Each renewal cycle keeps its own Closed Amount. Recording a new
+> cycle's Closed Amount must not overwrite or erase the previous cycle's
+> recorded amount or its contribution to a closed reporting period.
+>
+> • Whether a renewal counts as a qualifying transaction for incentive
+> purposes is *pending client confirmation*, as listed in Section 206.
 
-If **Mark Renewed / Completed** is selected without a New Due Date:
+
+**78. Complete Without Another Renewal Date**
+
+Some Customer Purchases are completed once and do not require another
+renewal.
+
+If **Mark Renewed / Completed** is selected without a New Renewal Date:
 
 > • mark the current action completed
 >
@@ -3251,10 +4625,10 @@ If **Mark Renewed / Completed** is selected without a New Due Date:
 >
 > • no new reminders are scheduled
 
-If completed without a New Due Date, set the Customer Product/Service
+If completed without a New Renewal Date, set the Customer Purchase
 status to **Completed**.
 
-**73. Mark as Not Renewing**
+**79. Mark as Not Renewing**
 
 If the Customer will not renew:
 
@@ -3286,11 +4660,11 @@ After saving:
 >
 > • retain the full history
 
-The Product/Service remains visible on the Customer Profile.
+The Customer Purchase remains visible on the Customer Profile.
 
-**74. Overdue Renewal Behaviour**
+**80. Overdue Renewal Behaviour**
 
-A Customer Product/Service becomes **Overdue** when its Due Date passes
+A Customer Purchase becomes **Overdue** when its Renewal Date passes
 without being completed or marked Not Renewing.
 
 Overdue items:
@@ -3301,7 +4675,7 @@ Overdue items:
 >
 > • remain actionable
 >
-> • continue to show their original Due Date
+> • continue to show their original Renewal Date
 >
 > • do not automatically renew or close
 
@@ -3315,7 +4689,7 @@ Available actions include:
 >
 > • Mark Not Renewing
 
-**75. Upcoming Actions on Customer Profile**
+**81. Upcoming Actions on Customer Profile**
 
 The Customer Profile should show the nearest outstanding actions.
 
@@ -3351,18 +4725,19 @@ Actions may include:
 
 depending on the item type.
 
-**76. Customer Activity & Notes**
+**82. Customer Activity & Notes**
 
 The Customer timeline combines important activity from across the
-Customer relationship.
+Customer relationship, including activity on each of the Customer's
+purchases.
 
 Examples:
 
 **Today · 10:30 AM**
 
-**WhatsApp reminder sent**
+**WhatsApp renewal reminder sent**
 
-**Health Insurance renewal**
+**Family Health Optima renewal**
 
 **Yesterday · 4:15 PM**
 
@@ -3370,9 +4745,21 @@ Examples:
 
 **02 Sep · 11:10 AM**
 
-**Health Insurance renewed**
+**Family Health Optima renewed**
 
-**New due date: 26 Aug 2027**
+**New renewal date: 26 Aug 2027**
+
+**01 Sep · 3:20 PM**
+
+**Purchase marked Closed/Active by Arun**
+
+**Closed Amount recorded**
+
+**01 Sep · 3:05 PM**
+
+**Policy schedule uploaded by Arun**
+
+**Family Health Optima**
 
 **29 Aug · 9:15 AM**
 
@@ -3388,52 +4775,84 @@ The timeline should include relevant:
 >
 > • Emails
 >
-> • Product/Service additions
+> • Customer Purchase created
+>
+> • required policy document uploaded, replaced or removed
+>
+> • purchase marked `Closed/Active`
+>
+> • Closed Amount recorded or changed
 >
 > • renewal/completion events
 >
-> • Record Owner changes
+> • Record Owner changes on the Customer or on a purchase
 >
-> • document uploads
+> • custom field changes, where meaningful
 
 Users may add a manual note using: **+ Add Note**
 
-**77. Customer Documents**
+Timeline visibility follows the reporting hierarchy in Section 2.3. A
+supervisor seeing an activity row does not become the owner of the
+related record.
 
-Customer-related files may be uploaded to the Customer Profile.
 
-Examples:
+**83. Policy Documents on the Customer Profile**
 
-> • policy document
+The Customer Profile summarises the policy documents held against that
+Customer's purchases. Documents themselves belong to a **Customer
+Purchase**, not to the Customer record, and are managed from the
+Customer Purchase Detail screen defined in Section 68.2.
+
+V1 covers **policy-related documents only**. Personal identity and KYC
+documents are outside this requirement. The full document model is
+defined in Section 205.
+
+The summary should show, per Customer Purchase:
+
+> • the Plan/Sub-product and Provider
 >
-> • certificate
+> • required-document completeness, for example **2 of 3 uploaded**
 >
-> • agreement
+> • which required documents are still missing
 >
-> • ID/supporting document
->
-> • service document
+> • whether the purchase is blocked from `Closed/Active` as a result
 
-Each document should show:
+Each listed document should show:
 
+> • Document Type, where it satisfies a required document
+>
 > • file name
 >
 > • uploaded by
 >
 > • uploaded date
 >
-> • related Product/Service where applicable
+> • the related Customer Purchase
 
 Actions:
 
+**Upload**
+
 **View / Download**
 
-**Delete / Archive** — according to permissions
+**Replace**
 
-Detailed document-storage configuration is not required for V1
-wireframes.
+**Delete / Archive**
 
-**78. Customer Archive**
+No approval or review follows an upload. Uploading a required document
+immediately satisfies that requirement.
+
+Uploaded policy documents are retained for future reference and remain
+available when the Customer or the purchase is archived.
+
+Document visibility and actions follow the reporting hierarchy in
+Section 2.3 and are enforced server-side.
+
+Which roles may upload, replace or remove policy documents is *pending
+client confirmation before security implementation and UAT*.
+
+
+**84. Customer Archive**
 
 Authorized users may archive a Customer.
 
@@ -3443,7 +4862,7 @@ Archived Customers:
 >
 > • remain accessible through an Archived filter
 >
-> • retain Products/Services, activities and documents
+> • retain Customer Purchases, activities and documents
 >
 > • can be restored
 
@@ -3461,7 +4880,7 @@ the confirmation must warn that these active actions will be removed
 from normal work views/cancelled where applicable while their history is
 retained.
 
-**79. Customer Management — Mobile Behaviour**
+**85. Customer Management — Mobile Behaviour**
 
 The mobile Customer experience should prioritise contact and immediate
 actions.
@@ -3469,8 +4888,6 @@ actions.
 **Customer List**
 
 Use card/list rows.
-
-Example:
 
 Selecting the card opens Customer Profile.
 
@@ -3481,7 +4898,7 @@ Primary actions should remain easily accessible:
 **Call \| WhatsApp \| Email \| Follow-up \| More**
 
 **Call** follows the click-to-call behaviour defined in Sections
-27.1–27.5. It opens the phone's native calling interface and does
+29–33. It opens the phone's native calling interface and does
 not by itself complete a Follow-up or create a Call activity.
 
 Where the header cannot comfortably show every channel, Email may be
@@ -3493,14 +4910,35 @@ The profile should stack:
 >
 > • Upcoming Actions
 >
-> • Products & Services
+> • Customer Purchases
 >
 > • Activity
 >
 > • Documents
 
-**Add Product/Service** should remain accessible from the More menu or
-prominent profile action.
+**Add Customer Purchase** should remain accessible from the More menu or
+as a prominent profile action.
+
+**Customer Purchase on mobile**
+
+A purchase card should show the Plan, Provider, status, renewal date and
+document completeness, for example:
+
+**Family Health Optima**
+
+**Star Health · Health Insurance**
+
+**Documents: 1 of 3 uploaded**
+
+**Renewal: 26 Aug 2027**
+
+Uploading a required policy document must work from the phone, using the
+device's normal file and camera selection. This is a primary mobile
+task for Salespersons and Team Leads, not a desktop-only action.
+
+Marking a purchase `Closed/Active` is available on mobile once the
+required documents are complete, and is disabled with an explanation
+while any are missing.
 
 **Renewals & Reminders**
 
@@ -3510,13 +4948,13 @@ Example:
 
 **Ramesh Kumar**
 
-**Health Insurance**
+**Family Health Optima · Star Health**
 
 **STAR/FH/44120**
 
 **Due in 4 days**
 
-**Reminder: Not Scheduled**
+**Reminder: Scheduled**
 
 **Assigned To: Arun**
 
@@ -3528,20 +4966,48 @@ Tabs such as:
 
 may scroll horizontally on mobile.
 
-**80. Customer / Renewal Flow Summary**
+Every mobile list is scoped by the reporting hierarchy in Section 2.3,
+exactly as on desktop.
 
-The Customer workflow should support both customers converted from Leads
-and customers added directly.
+
+**86. Customer / Purchase / Renewal Flow Summary**
+
+The Customer workflow supports both customers converted from Leads and
+customers added directly.
 
 **Customer**
 
 ↓
 
-**Add Product / Service**
+**Add Customer Purchase**
+
+**Category → Provider → Plan/Sub-product**
 
 ↓
 
-**Enter Due / Renewal Date**
+**Enter Closed Amount and Renewal Date**
+
+↓
+
+**Upload Required Policy Documents**
+
+**│**
+
+**├── Incomplete → purchase stays not closed**
+
+**│ Closed/Active unavailable, missing documents listed**
+
+**│**
+
+**└── Complete**
+
+↓
+
+**Mark Closed/Active**
+
+↓
+
+**Closed Amount becomes eligible for performance and incentive totals**
 
 ↓
 
@@ -3549,15 +5015,15 @@ and customers added directly.
 
 ↓
 
-**Due Date Approaches**
+**Renewal Date Approaches**
 
 ↓
 
-**In-app / WhatsApp / Email Reminder**
+**Automatic In-app / WhatsApp / Email Reminder**
 
 ↓
 
-**Customer Responds / Staff Follows Up**
+**Customer Responds / Owner Follows Up**
 
 ↓
 
@@ -3569,7 +5035,7 @@ and customers added directly.
 
 │ ↓
 
-**│ New Due Date?**
+**│ New Renewal Date?**
 
 **│ │**
 
@@ -3589,7 +5055,15 @@ and customers added directly.
 
 **Close Current Cycle**
 
-**81. WhatsApp Module**
+A Customer may repeat this flow independently for each Plan/Sub-product
+they purchase. Each Customer Purchase carries its own documents, Closed
+Amount, status and renewal cycles.
+
+Conversion from a Lead does not require any document. Documents are
+required only to move a Customer Purchase to `Closed/Active`.
+
+
+**87. WhatsApp Module**
 
 The WhatsApp module allows authorized users to communicate with Leads
 and Customers from the CRM and manage incoming customer replies.
@@ -3600,13 +5074,13 @@ V1 supports:
 >
 > • template-based messages where required by the WhatsApp platform
 >
-> • renewal/reminder messages
+> • renewal/reminder messages for Customer Purchases
 >
 > • controlled bulk messaging to eligible recipients
 >
 > • incoming customer replies
 >
-> • lightweight shared conversation inbox
+> • a shared conversation inbox scoped by the reporting hierarchy
 >
 > • conversation assignment
 >
@@ -3639,13 +5113,21 @@ Email is a separate outbound communication channel in V1 and is defined
 under Email Communications. It is not part of the WhatsApp module and
 does not share the WhatsApp conversation inbox.
 
-For V1, each workspace uses **one connected WhatsApp business messaging
-connection/number**.
+A&S Fincare uses **one connected WhatsApp business messaging
+connection/number** for the whole organization. Support for multiple
+WhatsApp numbers is outside V1.
 
-Support for multiple WhatsApp numbers within the same workspace is
-outside V1.
+All WhatsApp behaviour is subject to the visibility model in
+Section 89.1 and the fixed role behaviour in Section 2. A conversation
+may be owned only by a Team Lead or Salesperson, and a supervisory reply
+or assignment never transfers ownership.
 
-**82. WhatsApp Navigation**
+Outbound messaging is always subject to Meta platform rules, including
+template requirements, messaging eligibility, consent and opt-out. The
+CRM must never attempt to bypass them.
+
+
+**88. WhatsApp Navigation**
 
 Selecting **WhatsApp** from the main navigation opens the shared
 WhatsApp Inbox.
@@ -3674,33 +5156,90 @@ Each conversation row should show:
 
 Selecting a conversation opens the Conversation screen.
 
-Staff users see only conversations permitted by their role.
+The **Unassigned** tab is shown only to Admins and Managers. Team Leads
+and Salespersons see **All** and **Mine** only.
 
-**83. WhatsApp Inbox**
+What each tab contains is determined by the visibility model in
+Section 89.1.
+
+
+**89. WhatsApp Inbox**
 
 The Inbox provides a shared view of incoming and outgoing WhatsApp
-conversations.
+conversations, scoped by role.
 
 **Tabs**
 
 **All**
 
-Shows conversations the user has permission to access.
+Conversations the user is permitted to access.
 
 **Mine**
 
-Shows conversations currently **Assigned To** the logged-in user.
+Conversations currently **Assigned To** the logged-in user. For a
+Salesperson this is the same set as **All**.
 
 **Unassigned**
 
-Shows conversations that do not currently have an Assigned To user.
+Conversations that do not currently have an Assigned To user.
 
-Owner/Admin and permitted Managers may access Unassigned conversations.
+**The Unassigned tab is shown only to Admins and Managers.** Team Leads
+and Salespersons do not see it, because they have no unassigned
+visibility.
 
-Staff users should not automatically have access to all workspace
-conversations.
+## 89.1 WhatsApp Role Visibility
 
-**84. Conversation List**
+This is the authoritative WhatsApp visibility model. It applies to the
+inbox, conversation lists, search, counts, unread badges, previews,
+notifications and exports alike.
+
+| Role | Assigned conversation visibility | Unassigned visibility | Reply scope | Reassignment scope |
+|---|---|---|---|---|
+| Admin | All assigned conversations in the organization | All unassigned conversations | Assigned conversations organization-wide. **No reply while unassigned** | Organization-wide |
+| Manager | Conversations assigned anywhere below that Manager | All unassigned conversations across the organization | Assigned conversations below that Manager. **No reply while unassigned** | Only within that Manager's reporting hierarchy |
+| Team Lead | Their own conversations and those assigned to Salespersons in their team | None | Their own and their team's assigned conversations | Only within their own team |
+| Salesperson | Conversations assigned to them | None | Conversations assigned to them | Pending client confirmation |
+
+**Rules**
+
+> • **An unassigned conversation cannot be replied to by anyone.**
+> Viewing it and answering it are different things: Admins and
+> Managers can see the unassigned queue, but the reply composer and
+> send actions are unavailable until the conversation has been
+> assigned to a Team Lead. See Section 93.1.
+>
+> • All Admins and all Managers can see the unassigned queue.
+>
+> • Team Leads and Salespersons cannot see the unassigned queue.
+>
+> • A Manager's organization-wide visibility of **unassigned**
+> conversations is a deliberate exception to their normal branch-only
+> visibility. It does not extend to assigned conversations.
+>
+> • Once an unassigned conversation is assigned into a hierarchy, a
+> Manager must not retain visibility merely because they saw it in the
+> unassigned queue, unless it now belongs below that Manager.
+>
+> • Admin retains organization-wide visibility at all times.
+>
+> • Peer Managers cannot see one another's assigned conversations.
+>
+> • Peer Team Leads cannot see one another's assigned conversations.
+>
+> • A Salesperson cannot see a peer's conversations, including peers in
+> the same team.
+
+**Enforcement**
+
+Conversation counts, filters, search results, notifications, unread
+counts, previews and exports must all obey these rules.
+
+Every read, reply, link, assign and reassign action must be authorized
+on the server. A hidden tab, a hidden button or an omitted row is
+presentation, not authorization.
+
+
+**90. Conversation List**
 
 Example:
 
@@ -3744,6 +5283,10 @@ Yesterday
 
 Open
 
+The list shows only conversations within the viewer's permitted scope
+under Section 89.1. The Unassigned row above appears for Admins and
+Managers only.
+
 Unread conversations should be visually distinguishable.
 
 Search supports:
@@ -3752,17 +5295,29 @@ Search supports:
 >
 > • phone number
 
+**Scoped results**
+
+Search results, conversation counts, unread counts, filter options and
+message previews are all computed only over conversations the viewer is
+permitted to see. A preview must never surface message content from a
+peer Manager's branch or a peer Team Lead's team, and a count must never
+include conversations the viewer cannot open.
+
+Exports of conversation data follow the same scope.
+
 V1 does not require complex support-inbox filters, labels or queues.
 
-**85. Conversation Identity**
+
+**91. Conversation Identity**
 
 A WhatsApp conversation is primarily identified by:
 
-**Workspace WhatsApp Number + Contact Phone Number**
+**A&S Fincare WhatsApp Number + Contact Phone Number**
 
-The system should maintain a single continuous conversation history for
-that contact rather than creating a separate conversation every time a
-message is sent.
+A&S Fincare uses one organization WhatsApp number, as defined in
+Section 196. The system should maintain a single continuous conversation
+history for each contact rather than creating a separate conversation
+every time a message is sent.
 
 Where the same phone number is linked to a Lead that is later converted
 into a Customer, the existing WhatsApp conversation continues and
@@ -3773,7 +5328,13 @@ The conversion should **not create a second conversation**.
 Closed conversations are also part of the same history and are reopened
 rather than duplicated when new messages arrive.
 
-**86. WhatsApp Conversation Screen**
+A single continuous conversation does not mean a single audience.
+Reassignment changes who can see the conversation going forward, and a
+user who loses access loses access to the whole thread, including its
+earlier messages.
+
+
+**92. WhatsApp Conversation Screen**
 
 Recommended desktop structure:
 
@@ -3795,11 +5356,11 @@ Recommended desktop structure:
 
 **Business:**
 
-**Your Health Insurance policy expires**
+**Your Family Health Optima policy with Star**
 
-**on 26 September. Would you like us**
+**Health is due for renewal on 26 September.**
 
-**to assist with renewal?**
+**Would you like us to assist with renewal?**
 
 **10:32 AM**
 
@@ -3815,9 +5376,9 @@ Recommended desktop structure:
 
 **Customer Context**
 
-**Health Insurance**
+**Family Health Optima · Star Health**
 
-**Due: 26 Sep 2026**
+**Renewal Date: 26 Sep 2026**
 
 **Record Owner: Arun**
 
@@ -3830,11 +5391,35 @@ who the customer is and take the next action.
 
 It should not reproduce the entire Customer Profile.
 
-**87. Conversation Assignment**
+**Context follows scope**
+
+The CRM context panel shows only information the viewer is permitted to
+see under Section 2.3. **Open Customer** is offered only where the
+viewer may open that record.
+
+Where a supervisory user is replying to a conversation they can see but
+whose linked record they may not open, the panel must say so plainly
+rather than exposing the record's details.
+
+The screen should make clear whether the viewer is the conversation
+owner or is acting in a supervisory capacity, so that replying is never
+mistaken for taking ownership.
+
+Where the conversation is unassigned, the screen is read-only: no
+composer and no send action are shown, and the screen states that the
+conversation must be assigned to a Team Lead before it can be answered.
+See Sections 93.1 and 96.
+
+
+**93. Conversation Assignment**
 
 A WhatsApp conversation uses **Assigned To**.
 
 It does not use Record Owner.
+
+**A conversation may be assigned only to a Team Lead or a Salesperson.**
+Admins and Managers can never be the assignee of a conversation, by any
+route — automatic inheritance, manual assignment, reassignment or reply.
 
 When the first conversation is created for an existing Lead or Customer:
 
@@ -3852,7 +5437,21 @@ Example:
 
 **New WhatsApp Conversation Assigned To: Arun**
 
-An authorized user may later reassign the conversation.
+**Reassignment scope**
+
+An authorized user may reassign a conversation only within their
+permitted scope:
+
+> • a **Team Lead** may reassign only within their own team
+>
+> • a **Manager** may reassign only within their own reporting
+> hierarchy, and may not move a conversation into another Manager's
+> hierarchy
+>
+> • an **Admin** may reassign anywhere in the organization
+>
+> • whether a **Salesperson** may reassign a conversation is *pending
+> client confirmation before security implementation and UAT*
 
 Example:
 
@@ -3862,9 +5461,124 @@ This does **not** change:
 
 **Customer Record Owner: Arun**
 
-Every conversation reassignment should be recorded in activity/history.
+**Separate facts**
 
-**88. Conversation Status**
+The following are distinct and must be recorded and displayed
+separately:
+
+> • **conversation owner** — the Team Lead or Salesperson in Assigned To
+>
+> • **replied by** — the user who sent a particular message
+>
+> • **assigned by** — the user who performed an assignment
+>
+> • **reassigned by** — the user who performed a reassignment
+
+**Assignment must precede any reply**
+
+A conversation that is unassigned cannot be replied to by anyone. An
+Admin or Manager must assign it to a Team Lead first. See Section 93.1.
+
+An Admin or Manager may assign or reassign a conversation, and may reply
+to an **assigned** conversation within their permitted scope,
+**without becoming its owner**. Replying never claims a conversation,
+and the first reply after an assignment does not change ownership.
+
+A supervisory action on a conversation does not change the Record Owner
+of the linked Lead or Customer. Changing that ownership is a separate,
+separately authorized action.
+
+Every conversation assignment and reassignment is recorded in
+activity/history, identifying who performed it, and is auditable.
+
+## 93.1 Unassigned Conversation Workflow
+
+A conversation is **Unassigned** when no Team Lead or Salesperson holds
+it — typically because the sender could not be confidently matched to a
+permitted CRM record.
+
+**Assignment precedes any reply**
+
+An unassigned conversation **cannot be replied to by anyone**. The reply
+composer and every send action are unavailable while the conversation is
+unassigned. This applies to Admins and Managers as well, even though
+they are the only roles who can see it.
+
+To respond, the conversation must first be assigned to a Team Lead. Only
+then does reply access follow the ordinary hierarchy in Section 89.1.
+
+**Admin**
+
+> • can open and read any unassigned conversation
+>
+> • cannot reply while it remains unassigned
+>
+> • can assign it to **any active Team Lead** in the organization
+>
+> • does not become its owner by assigning it
+
+**Manager**
+
+> • can open and read any unassigned conversation, organization-wide
+>
+> • cannot reply while it remains unassigned
+>
+> • can assign it **only to an active Team Lead who reports to that**
+> **Manager**
+>
+> • cannot assign it into another Manager's hierarchy
+>
+> • does not become its owner by assigning it
+
+**Team Lead and Salesperson**
+
+> • cannot see or act on an unassigned conversation
+>
+> • gain access only once it has been assigned into their permitted team
+> scope
+
+**After assignment**
+
+Once assigned, ordinary visibility and reply access resume:
+
+> • **Admin** may reply organization-wide.
+>
+> • **Manager** may reply only if the assigned conversation is within
+> that Manager's reporting hierarchy.
+>
+> • **Team Lead** may reply to their own and their team's conversations.
+>
+> • **Salesperson** may reply to conversations assigned to them.
+
+A Manager who could previously see the conversation only because it sat
+in the shared unassigned queue must **not** retain visibility once it
+belongs below a different Manager, and gains no reply access to it.
+Because a Manager can only ever assign to a Team Lead reporting to them,
+a Manager cannot route a conversation outside their own hierarchy and
+then continue to act on it. Admin retains organization-wide visibility.
+
+Where the conversation could not be matched to any CRM record, the Admin
+or Manager assigns it by creating a Lead and selecting an active Team
+Lead, as defined in Section 101. That selection assigns both the new Lead
+and this conversation directly to the selected Team Lead.
+
+Assignment does not make the assigning Admin or Manager the owner, and
+the first reply after assignment does not change ownership. The owner
+remains the assigned Team Lead or Salesperson.
+
+**Not decided**
+
+These questions are collected in the consolidated register in
+Section 212.
+
+> • Who is operationally responsible for the unassigned queue, and the
+> expected response time. *Pending client confirmation.*
+>
+> • V1 does not automatically assign unassigned conversations. Automatic
+> assignment of the unassigned queue is not approved and must not be
+> introduced.
+
+**94. Conversation Status**
 
 V1 uses:
 
@@ -3909,7 +5623,7 @@ Closing a conversation does not:
 WhatsApp conversations are **not permanently deleted through normal V1
 CRM actions**.
 
-**89. Starting an Individual WhatsApp Message**
+**95. Starting an Individual WhatsApp Message**
 
 Authorized users may initiate WhatsApp messaging from:
 
@@ -3919,30 +5633,64 @@ Authorized users may initiate WhatsApp messaging from:
 >
 > • WhatsApp Inbox
 >
-> • Customer Product/Service Detail
+> • Customer Purchase Detail
 >
 > • Renewals & Reminders where applicable
+
+A user may start or reply to a message only where **both** conditions
+hold:
+
+> 1. their fixed role permits the action; and
+>
+> 2. the Lead, Customer, Customer Purchase or conversation falls within
+> their hierarchy scope under Section 89.1.
 
 Selecting **WhatsApp** should:
 
 > • identify the CRM record's phone number
 >
 > • open the existing WhatsApp conversation for that number if one
-> exists
+> exists and the user is permitted to see it
 >
 > • otherwise create/open the messaging conversation for that number
 
 The system should not create duplicate conversations for the same
 contact phone number.
 
+Where a conversation already exists but is outside the user's permitted
+scope, the interface must not open it, and must not disclose its
+existence, its assignee or its team. It explains that the contact is
+handled elsewhere and allows escalation to an authorized supervisor.
+
 If the record has no valid phone number:
 
 **WhatsApp unavailable — no valid phone number**
 
-**90. Message Composer**
+Starting a conversation does not change the Record Owner of the related
+record.
 
-The available composer depends on the messaging state allowed by the
-connected WhatsApp platform.
+
+**96. Message Composer**
+
+The available composer depends on whether the conversation is assigned
+and on the messaging state allowed by the connected WhatsApp platform.
+
+**When the conversation is unassigned**
+
+No composer is shown and no send action is available, for any role. The
+screen is read-only and explains what is required:
+
+**This conversation is unassigned.**
+
+**Assign it to a Team Lead before replying.**
+
+Admins and Managers see the relevant assign action alongside this
+message; Team Leads and Salespersons never see an unassigned
+conversation at all. See Section 93.1.
+
+Hiding the composer is not sufficient on its own. The send endpoint must
+also reject a message on an unassigned conversation, as required by
+Section 104.
 
 **When normal reply/free-form messaging is allowed**
 
@@ -3973,13 +5721,13 @@ The CRM should use the messaging eligibility/state returned by the
 WhatsApp integration rather than asking users to understand WhatsApp
 platform rules themselves.
 
-**91. WhatsApp Templates**
+**97. WhatsApp Templates**
 
-Owner/Admin users can manage the **CRM's available WhatsApp templates
-and their use within the CRM**.
+Admin manages the CRM's available WhatsApp templates and their use
+within the CRM.
 
-The template screen should display relevant templates available through
-the connected WhatsApp integration.
+The template screen should display the relevant templates available
+through the connected WhatsApp integration.
 
 Example:
 
@@ -3987,11 +5735,15 @@ Example:
 
 **Purpose**
 
+**Language**
+
 **Status**
 
 Renewal Reminder
 
 Renewal
+
+English
 
 Approved
 
@@ -3999,17 +5751,23 @@ Follow-up Reminder
 
 Follow-up
 
+English
+
 Approved
 
-Service Expiry
+Policy Document Shared
 
-Expiry
+Service
+
+English
 
 Pending
 
 Offer Message
 
 Marketing
+
+English
 
 Rejected
 
@@ -4023,8 +5781,10 @@ Relevant states may include:
 >
 > • Unavailable
 
-Only templates currently eligible for sending should be selectable by
-normal users.
+Only templates currently approved and eligible for sending may be
+selected by normal users. An inactive, pending, rejected or unavailable
+template must not be selectable, and the interface must explain why
+rather than failing after the send attempt.
 
 The CRM should not recreate the entire WhatsApp platform administration
 interface.
@@ -4034,7 +5794,12 @@ through the connected WhatsApp provider/platform, the CRM should direct
 the administrator appropriately rather than pretending the action
 occurred locally.
 
-**92. Template Variables**
+Template management is configurable business data. Managing templates
+does not change any role's visibility, ownership or authorization, and
+must never be presented as a permission setting. See Section 2.6.
+
+
+**98. Template Variables**
 
 Templates may use supported CRM values.
 
@@ -4042,7 +5807,8 @@ Example:
 
 **Hello {{customer_name}},**
 
-**Your {{product_service}} is due on {{due_date}}.**
+**Your {{plan_name}} policy with {{provider_name}} is due for renewal on
+{{renewal_date}}.**
 
 **Please reply if you would like assistance.**
 
@@ -4050,23 +5816,48 @@ Before sending:
 
 **Hello Ramesh,**
 
-**Your Health Insurance is due on 26 September 2026.**
+**Your Family Health Optima policy with Star Health is due for renewal
+on 26 September 2026.**
 
 **Please reply if you would like assistance.**
 
-Supported variables should come from known CRM fields.
-
-Examples:
+**Available variables**
 
 > • Customer Name
 >
-> • Lead Name
+> • Lead Name, where applicable
 >
-> • Product / Service
+> • Product Category
 >
-> • Due Date
+> • Provider
 >
-> • Reference Number
+> • Plan / Sub-product
+>
+> • Policy or Reference Number
+>
+> • Renewal Date
+>
+> • Record Owner Name
+>
+> • Team Lead Name, where appropriate
+>
+> • A&S Fincare business name
+>
+> • A&S Fincare contact details
+
+Variables resolve only from the recipient's own record. A template must
+never be able to pull data from a record outside the sending user's
+permitted scope.
+
+**Not permitted as variables**
+
+> • the contents of a policy document
+>
+> • authentication data, tokens or credentials
+>
+> • internal identifiers that would expose other records
+>
+> • Closed Amount, incentive figures or other internal performance data
 
 Before manual or bulk sending, the system should resolve required
 variables.
@@ -4079,7 +5870,8 @@ If a required value is missing:
 
 A preview should show the final populated message.
 
-**93. Incoming WhatsApp Message**
+
+**99. Incoming WhatsApp Message**
 
 When an incoming message is received:
 
@@ -4087,7 +5879,8 @@ When an incoming message is received:
 >
 > • find the existing conversation for that number
 >
-> • attempt to associate it with an existing Customer or Lead
+> • attempt to associate it with an existing Customer or Lead using
+> server-side logic
 >
 > • add the message to the conversation
 >
@@ -4097,13 +5890,27 @@ When an incoming message is received:
 >
 > • notify the Assigned To user where applicable
 
-If the conversation has no Assigned To user but is associated with a CRM
-record that has a Record Owner, the conversation should inherit that
-Record Owner as Assigned To.
+**Determining Assigned To**
 
-If no assignment can be determined, it remains **Unassigned**.
+Matching and assignment are performed by authorized server-side logic
+over all CRM records, independently of who happens to be viewing. This
+is what allows a message to reach its correct owner.
 
-**94. Matching Incoming Numbers to CRM Records**
+If the conversation has no Assigned To user but is confidently
+associated with a CRM record that has a Record Owner, the conversation
+inherits that Record Owner as **Assigned To**. That owner is always a
+Team Lead or Salesperson.
+
+If no assignment can be determined, the conversation remains
+**Unassigned** and enters the unassigned queue visible to all Admins and
+Managers. While it is unassigned it can be read but **not replied to**
+by anyone, including an Admin or Manager. See Section 93.1.
+
+A conversation may never be assigned to an Admin or a Manager, including
+automatically. See Section 93.
+
+
+**100. Matching Incoming Numbers to CRM Records**
 
 Incoming phone numbers should be matched against Leads and Customers.
 
@@ -4123,10 +5930,13 @@ treated as two conflicting matches**.
 The Customer becomes the primary active CRM record while the Lead
 remains historical.
 
-**95. Message From Unknown Number**
+**101. Message From Unknown Number**
 
-If no matching Lead or Customer exists, the conversation still appears
-in the Inbox.
+If no matching Lead or Customer can be confidently resolved, the
+conversation remains **Unassigned** and appears in the unassigned queue.
+
+The unassigned queue is visible to **all Admins and all Managers**. Team
+Leads and Salespersons cannot see it. See Sections 89.1 and 93.1.
 
 Example:
 
@@ -4136,29 +5946,96 @@ Example:
 
 > Hi, I would like to know about your services.
 
+An Admin or Manager may open and read the conversation, but **cannot
+reply to it while it is unassigned**. The reply composer and send
+actions are unavailable. To respond, the conversation must first be
+assigned to a Team Lead, which for an unknown contact is done by
+creating a Lead as described below.
+
 Actions:
 
 **Create Lead**
 
-**Create Customer**
+**Link to Existing Record**
 
-If Leads are disabled:
+**Creating a Lead from an unknown conversation**
 
-**Create Customer**
+The acting user must first select an active **Team Lead**:
 
-The phone number should be prefilled.
-
-After creation:
-
-> • link the conversation to the new CRM record
+> • an **Admin** may select any active Team Lead in the organization
 >
-> • retain the existing conversation history
+> • a **Manager** may select only an active Team Lead who reports to
+> that Manager
+
+Selecting the Team Lead identifies both the destination team and the
+initial operational owner.
+
+The flow is then:
+
+> 1. The Lead is created with the phone number prefilled.
 >
-> • assign the conversation according to the normal assignment rule
+> 2. **The selected Team Lead becomes the Lead's Record Owner.**
+>
+> 3. **The existing WhatsApp conversation is assigned to that same
+> selected Team Lead.**
+>
+> 4. The complete conversation history is preserved. Creating the Lead
+> must **not** start a new conversation thread.
+>
+> 5. Only after this direct assignment may authorized users reply,
+> following Section 89.1.
 
-Creating a Lead/Customer should **not start a new conversation thread**.
+**A deliberate exception to automatic Lead round robin**
 
-**96. Multiple CRM Record Match**
+A Lead created from an unknown WhatsApp conversation is assigned
+**directly** to the selected Team Lead. It does **not** enter that team's
+round-robin pool at this point.
+
+Round robin continues to apply to the ordinary Lead-assignment paths
+defined elsewhere in this specification, including authorized manual Lead
+creation and bulk import. Those paths remain team-scoped, with a pool
+containing the team's active Team Lead and active Salespersons. See
+Sections 189 and 189.1.
+
+The selected Team Lead may subsequently reassign the Lead or the
+conversation within their own team, subject to the fixed permission rules
+in Section 2.
+
+The Admin or Manager who performed the action does **not** become the
+owner of the Lead or of the conversation. The activity history records
+who created the Lead and who selected the Team Lead. The direct
+assignment and any later reassignment are auditable. See Section 208.
+
+**If no eligible active Team Lead is available**
+
+If the acting user's permitted scope contains no eligible active Team
+Lead, assignment must fail safely:
+
+> • the Lead must not be assigned to an Admin or a Manager
+>
+> • the conversation remains Unassigned and is preserved with its
+> history
+>
+> • because the conversation is still unassigned, **it still cannot be
+> replied to by anyone**, including the Admin or Manager who is looking
+> at it
+>
+> • the problem is surfaced to an authorized supervisor rather than
+> silently ignored
+
+The final escalation behaviour in this case is *pending client
+confirmation*.
+
+**Operational responsibility**
+
+Who is operationally responsible for working the unassigned queue, and
+within what response expectation, is *pending client confirmation*. This
+specification does not claim that Admin personally handles every
+unassigned conversation, and V1 does not automatically assign unassigned
+conversations.
+
+
+**102. Multiple CRM Record Match**
 
 If a phone number genuinely matches multiple unrelated active CRM
 records, the system must not silently select one.
@@ -4182,9 +6059,9 @@ Until resolved:
 > • do not incorrectly add message activity to one of the possible CRM
 > records
 
-**97. Link / Correct Conversation Association**
+**103. Link / Correct Conversation Association**
 
-Authorized users may link an unknown or unresolved conversation to an
+An authorized user may link an unknown or unresolved conversation to an
 existing:
 
 > • Lead
@@ -4203,8 +6080,21 @@ Search by:
 >
 > • email
 
+**Scope of the search**
+
+The search returns only records within the acting user's permitted scope
+under Section 2.3. A Manager or Team Lead must not be offered, and must
+not be able to discover, a record belonging to a peer hierarchy — not
+through search results, counts, autocomplete or an error message
+stating that a record exists elsewhere.
+
+Where a conversation genuinely belongs to a record outside the acting
+user's scope, the interface says that it cannot be resolved at this
+level and allows escalation to an authorized supervisor, without
+revealing the record, its owner or its team.
+
 If a conversation is associated with the wrong CRM record, an authorized
-user may correct the association.
+user may correct the association within the same scope rules.
 
 Correcting the CRM association:
 
@@ -4214,12 +6104,23 @@ Correcting the CRM association:
 >
 > • updates where future conversation activity is displayed
 
-The change should be recorded in history.
+**Linking is not ownership**
 
-**98. Sending a Message**
+Linking or relinking a conversation does not make the acting user the
+conversation owner or the record's Record Owner. After linking, the
+conversation's Assigned To follows the linked record's Record Owner, as
+described in Section 99.
+
+The change is recorded in history and is auditable, identifying who
+performed it.
+
+
+**104. Sending a Message**
 
 Before sending any outgoing message, the system should verify:
 
+> • the conversation is assigned to a Team Lead or Salesperson
+>
 > • WhatsApp is connected
 >
 > • the user has messaging permission
@@ -4232,12 +6133,16 @@ Before sending any outgoing message, the system should verify:
 >
 > • required template variables are available
 
+An unassigned conversation fails the first check. No user may send a
+message on it, including an Admin or a Manager. The conversation must
+first be assigned to a Team Lead, as defined in Section 93.1.
+
 If a condition fails, display the reason before or after the send
 attempt as appropriate.
 
 The system must not show an unsuccessful message as successfully sent.
 
-**99. Message Status**
+**105. Message Status**
 
 Outgoing messages should display the delivery status available from the
 WhatsApp integration.
@@ -4271,7 +6176,7 @@ If a message fails:
 Retrying should create a new send attempt rather than rewriting the
 historical failed attempt as successful.
 
-**100. WhatsApp Message History in CRM Records**
+**106. WhatsApp Message History in CRM Records**
 
 Messages associated with a Lead or Customer should contribute to its
 Activity Timeline.
@@ -4284,16 +6189,23 @@ Example:
 
 **WhatsApp renewal reminder sent**
 
-Health Insurance
+Family Health Optima · Star Health
 
-Selecting the activity may open the corresponding WhatsApp conversation.
+Selecting the activity may open the corresponding WhatsApp conversation,
+subject to the viewer's permitted scope under Section 89.1.
 
 The complete message thread remains available in the WhatsApp module.
 
 Incoming messages that represent meaningful CRM activity may also appear
 in the Customer/Lead timeline without duplicating the full conversation.
 
-**101. Create Follow-up From Conversation**
+Message history follows the visibility of the related record. A
+timeline entry showing that a supervisor replied identifies who replied;
+it does not make that supervisor the owner of the record or the
+conversation.
+
+
+**107. Create Follow-up From Conversation**
 
 From a linked WhatsApp conversation:
 
@@ -4316,7 +6228,8 @@ The normal Follow-up form opens with:
 > • Note
 
 The Follow-up's **Assigned To** may differ from the conversation's
-Assigned To.
+Assigned To, but must be a Team Lead or Salesperson within the acting
+user's permitted scope under Section 2.3.
 
 Creating a Follow-up does not:
 
@@ -4325,26 +6238,40 @@ Creating a Follow-up does not:
 > • automatically send a WhatsApp message
 >
 > • change the CRM Record Owner
+>
+> • change the conversation's Assigned To
+>
+> • make the acting user the owner of the conversation or record
 
-**102. Scheduled WhatsApp Renewal Reminder**
 
-A scheduled WhatsApp renewal reminder is different from a normal
-WhatsApp Follow-up.
+**108. Scheduled WhatsApp Renewal Reminder**
+
+A scheduled WhatsApp renewal reminder relates to a **Customer Purchase**
+with a Renewal Date. It is different from a normal WhatsApp Follow-up.
+Automatic renewal reminders are required in V1, as defined in
+Section 195.1.
 
 When a configured renewal reminder reaches its scheduled send time, the
 system attempts to send the relevant WhatsApp message automatically.
 
 Before sending, verify:
 
-> • Customer has a valid phone number
+> • the Customer and Customer Purchase still exist and are eligible
 >
-> • WhatsApp connection is active
+> • the Customer has a valid phone number
 >
-> • the message is eligible to be sent
+> • the WhatsApp connection is active
 >
-> • an eligible template exists where required
+> • the message is eligible to be sent under Meta rules
 >
-> • required CRM variables can be populated
+> • an eligible approved template exists where required
+>
+> • the Customer is not marked WhatsApp Opted Out
+>
+> • required variables can be populated, including Provider,
+> Plan/Sub-product, Policy Number and Renewal Date
+>
+> • the reminder instance has not already been sent
 
 If successful:
 
@@ -4356,7 +6283,7 @@ If successful:
 >
 > • record it in Customer Activity
 >
-> • retain it in Product/Service reminder history
+> • retain it in the Customer Purchase's reminder history
 
 If unsuccessful:
 
@@ -4366,12 +6293,23 @@ If unsuccessful:
 >
 > • record the available reason
 >
-> • surface the failure to appropriate users
+> • surface the failure to the responsible owner
+
+A reminder that cannot be attempted at all — for example because the
+Customer has opted out, or no approved template is available — is
+recorded as **Skipped** with a safe reason. It is never recorded as
+sent.
 
 A failed reminder does not automatically become Sent later unless a
-successful retry/send occurs.
+successful retry/send occurs. Retries and repeated background jobs must
+not produce a duplicate successful send for the same reminder instance.
 
-**103. Manual Renewal Reminder**
+Exact schedules, template content, escalation rules and channel
+precedence between WhatsApp and Email remain *pending client
+confirmation*.
+
+
+**109. Manual Renewal Reminder**
 
 From Renewals & Reminders, an authorized user may select:
 
@@ -4390,9 +6328,9 @@ Successful manual reminders should be recorded in:
 >
 > • Customer Activity
 >
-> • Product/Service reminder history
+> • the Customer Purchase's reminder history
 
-**104. Controlled Bulk WhatsApp Messaging**
+**110. Controlled Bulk WhatsApp Messaging**
 
 Authorized users may send the same eligible template message to multiple
 selected CRM records.
@@ -4409,8 +6347,34 @@ The action is:
 
 **Send WhatsApp Message**
 
-V1 bulk messaging is **selection-based messaging**, not a marketing
-campaign builder.
+**Selection scope**
+
+Selection is limited to records within the sender's hierarchy scope
+under Section 2.3. A user can never select, count, preview or message a
+record outside that scope.
+
+Selected totals, eligibility counts, exclusion counts and exclusion
+reasons must be computed only over records in scope, so that no figure,
+filter or validation result lets a user infer the existence, size or
+activity of a peer branch or team.
+
+**Meta rules continue to apply**
+
+Bulk messaging is selection-based messaging, not a marketing campaign
+builder. Approved templates are required wherever Meta rules require
+them, and messaging eligibility, consent and opt-out are enforced per
+recipient. The CRM must never attempt to bypass WhatsApp platform
+restrictions.
+
+**Outcomes**
+
+Each recipient's outcome is recorded individually. A retry must
+reattempt only the recipients that failed; recipients already sent
+successfully must never be sent again by a retry. A failed or excluded
+recipient must never be reported as sent.
+
+Bulk activity is auditable, including who initiated it, the template
+used, the recipients attempted and each outcome.
 
 It does not include:
 
@@ -4424,7 +6388,17 @@ It does not include:
 >
 > • complex segmentation
 
-**105. Bulk Recipient Validation**
+**Pending**
+
+These questions are collected in the consolidated register in
+Section 212.
+
+Which roles may initiate controlled bulk WhatsApp messaging is *pending
+client confirmation before security implementation and UAT*. It must not
+be assumed for any supervisory or operational role.
+
+
+**111. Bulk Recipient Validation**
 
 Before bulk sending, each selected record should be checked
 individually.
@@ -4450,7 +6424,7 @@ V1 should send only one copy of that bulk message to that number unless
 the records intentionally represent distinct eligible messages such as
 separate renewal items.
 
-**106. Bulk Message Review**
+**112. Bulk Message Review**
 
 Before sending:
 
@@ -4493,7 +6467,7 @@ Bulk send requires explicit confirmation.
 Excluded recipients do not prevent eligible recipients from being
 processed.
 
-**107. Bulk Message Result**
+**113. Bulk Message Result**
 
 After processing:
 
@@ -4529,7 +6503,7 @@ The user should be able to identify the affected records.
 
 V1 does not require campaign analytics beyond operational send results.
 
-**108. Messaging Eligibility / Opt-Out**
+**114. Messaging Eligibility / Opt-Out**
 
 The CRM must respect messaging eligibility or customer communication
 restrictions available through the WhatsApp integration and CRM
@@ -4553,30 +6527,32 @@ also be updated from the WhatsApp integration where supported.
 
 The CRM should never attempt to bypass WhatsApp platform restrictions.
 
-**109. WhatsApp Not Connected**
+**115. WhatsApp Not Connected**
 
-If the workspace has not connected WhatsApp:
+If A&S Fincare has not connected WhatsApp:
 
-**Owner/Admin view**
+**Admin view**
 
 **WhatsApp isn't connected yet.**
 
-Connect your business WhatsApp account to send and receive customer
+Connect the A&S Fincare WhatsApp account to send and receive customer
 messages from the CRM.
 
 **\[ Connect WhatsApp \]**
 
 **Other users**
 
-**WhatsApp is not connected for this workspace. Contact your
-administrator.**
+**WhatsApp is not connected. Contact your administrator.**
 
 WhatsApp actions elsewhere in the CRM should display a
 disabled/not-connected state.
 
-Failure to connect WhatsApp must not block normal CRM functionality.
+A missing connection is a configuration state. It must not block normal
+CRM functionality, and it must never cause an unsent message or reminder
+to be recorded as sent.
 
-**110. WhatsApp Connection Problem**
+
+**116. WhatsApp Connection Problem**
 
 If an existing WhatsApp connection becomes unavailable or requires
 administrator attention:
@@ -4599,11 +6575,11 @@ The CRM should clearly distinguish:
 >
 > • temporarily disconnected/connection problem
 
-**111. WhatsApp Notifications**
+**117. WhatsApp Notifications**
 
 Relevant notifications may include:
 
-> • new WhatsApp reply
+> • new WhatsApp reply on a conversation you are assigned
 >
 > • conversation assigned to you
 >
@@ -4625,22 +6601,64 @@ Selecting the notification opens the relevant:
 >
 > • bulk-send result
 
+**Scope**
+
+Notifications follow the visibility rules in Section 89.1. A
+notification must never reveal a conversation, message content, customer
+name, phone number or record outside the recipient's permitted scope —
+including in its title, preview text or badge count. Unread counts are
+scoped the same way.
+
+Unassigned-queue notifications, where used, go only to Admins and
+Managers. Opening one leads to a view-only conversation with no reply
+composer, because a conversation cannot be replied to until it has been
+assigned to a Team Lead. See Section 93.1.
+
+**Reauthorization on open**
+
+Opening a notification must reauthorize access on the server. If the
+user's access changed after the notification was created — for example
+the conversation was reassigned into another team, or the user's role or
+team changed — the destination must deny access safely and explain that
+the item is no longer available, without disclosing where it went, who
+now holds it or what it contained.
+
 Do not generate a user notification for every successful outgoing
 message.
 
-**112. WhatsApp Permission Behaviour**
 
-WhatsApp actions must follow the role/permission rules defined later
-under Settings → Roles & Permissions.
+**118. WhatsApp Permission Behaviour**
 
-At minimum, permissions should distinguish between:
+WhatsApp actions follow the fixed role behaviour defined in Section 2
+and the visibility matrix in Section 89.1. Role capabilities are not
+configurable in the CRM.
 
-> • viewing permitted conversations
+Two conditions must both hold before any WhatsApp action:
+
+> 1. the user's fixed role permits the action; and
 >
-> • sending individual messages
+> 2. the conversation, Lead or Customer falls within the user's
+> hierarchy scope.
+
+Confirmed behaviour:
+
+> • Viewing and replying follow the matrix in Section 89.1.
 >
-> • assigning/reassigning conversations
+> • Assignment and reassignment follow Sections 93 and 93.1.
 >
+> • A conversation may be assigned only to a Team Lead or Salesperson.
+>
+> • **No user may reply to a conversation while it is unassigned.** The
+> reply composer and send actions are unavailable until the conversation
+> has been assigned to a Team Lead. This applies to Admin and Manager
+> too, even though they can see the unassigned queue.
+>
+> • Admin and Manager may assign and reassign, and may reply to an
+> **assigned** conversation within their permitted scope, without
+> becoming the conversation owner.
+
+Permissions also distinguish between:
+
 > • closing/reopening conversations
 >
 > • sending bulk messages
@@ -4649,12 +6667,26 @@ At minimum, permissions should distinguish between:
 >
 > • viewing/managing templates
 
-Users should not be shown actions they cannot perform.
+Users should not be shown actions they cannot perform, but hiding a tab,
+button or conversation is presentation only. Every read, reply, link,
+assign and reassign action must be authorized on the server.
 
-The detailed role matrix will be defined in the Settings &
-Administration section.
+**Pending**
 
-**113. WhatsApp Inbox — Empty States**
+> • Whether a Salesperson may reassign a conversation. *Pending client
+> confirmation before security implementation and UAT.*
+>
+> • Which roles may initiate controlled bulk WhatsApp messaging.
+> *Pending client confirmation before security implementation and UAT.*
+>
+> • Who is operationally responsible for the unassigned queue, and
+> within what response expectation. *Pending client confirmation.*
+
+These are listed in Sections 188 and 212. They must not be assumed, and
+they are not settings an Admin can configure.
+
+
+**119. WhatsApp Inbox — Empty States**
 
 **No conversations**
 
@@ -4673,7 +6705,7 @@ receive a reply.
 
 Avoid displaying an empty table without explanation.
 
-**114. WhatsApp Inbox — Loading / Error States**
+**120. WhatsApp Inbox — Loading / Error States**
 
 **Loading**
 
@@ -4698,9 +6730,10 @@ that sending failed.
 
 Do not discard the user's unsent text solely because the send failed.
 
-**115. WhatsApp Inbox — Mobile Behaviour**
+**121. WhatsApp Inbox — Mobile Behaviour**
 
-WhatsApp is a primary operational mobile module.
+WhatsApp is a primary operational mobile area for Team Leads and
+Salespersons.
 
 **Inbox**
 
@@ -4713,8 +6746,14 @@ Use a vertical conversation list showing:
 > • time
 >
 > • unread state
+>
+> • Assigned To
 
-Assignment information may be shown where useful.
+The mobile inbox shows exactly the conversations the user's role and
+hierarchy scope permit under Section 89.1. A Team Lead or Salesperson
+has no Unassigned tab on mobile, because they have no unassigned
+visibility at all. Unread counts and the conversation list are scoped
+identically to desktop.
 
 **Conversation**
 
@@ -4728,7 +6767,7 @@ Useful actions:
 **Call \| Open Record \| Follow-up \| More**
 
 **Call** follows the click-to-call behaviour defined in Sections
-27.1–27.5. It opens the phone's native calling interface and does
+29–33. It opens the phone's native calling interface and does
 not by itself complete a Follow-up or create a Call activity.
 
 The message composer should remain easily accessible near the bottom of
@@ -4737,7 +6776,28 @@ the screen.
 Conversation assignment/status controls may be available through
 **More**.
 
-**116. WhatsApp Flow Summary**
+**What mobile must not hide**
+
+A narrow screen may condense these, but must never omit them:
+
+> • who the conversation is assigned to
+>
+> • whether the conversation is unassigned
+>
+> • message delivery status, including Failed
+>
+> • the reason a message could not be sent
+>
+> • opt-out state
+>
+> • whether a template is required because the reply window has closed
+
+Mobile enforces the same server-side authorization as desktop.
+Installing the CRM as a PWA does not widen access and does not cache
+conversation content beyond the rules in Section 210.1.
+
+
+**122. WhatsApp Flow Summary**
 
 **Incoming Message**
 
@@ -4749,11 +6809,11 @@ Conversation assignment/status controls may be available through
 
 ↓
 
-**Match CRM Record**
+**Match CRM Record — server-side**
 
 **│**
 
-**├── Existing Customer / Lead**
+**├── Confident Single Match**
 
 │ ↓
 
@@ -4761,7 +6821,9 @@ Conversation assignment/status controls may be available through
 
 │ ↓
 
-**│ Determine Assigned To**
+**│ Assigned To = record's Record Owner**
+
+**│ (Team Lead or Salesperson)**
 
 │ ↓
 
@@ -4769,7 +6831,7 @@ Conversation assignment/status controls may be available through
 
 │ ↓
 
-**│ Notify Responsible User**
+**│ Notify the Assigned owner**
 
 │ ↓
 
@@ -4777,21 +6839,77 @@ Conversation assignment/status controls may be available through
 
 **│**
 
-**└── No Match**
+**└── No Confident Match**
 
 ↓
 
-**Unknown Conversation**
+**Unassigned Conversation**
 
 ↓
 
-**Create Lead / Customer**
+**Visible to all Admins and all Managers**
 
-**OR Link Existing Record**
+**Not visible to Team Leads or Salespersons**
 
 ↓
 
-**Retain Same Conversation**
+**Admin or Manager reviews — view only**
+
+**No reply is possible while the conversation is unassigned**
+
+↓
+
+**Create Lead**
+
+**│**
+
+**├── Admin selects any active Team Lead**
+
+**└── Manager selects an active Team Lead reporting to them**
+
+↓
+
+**Eligible active Team Lead available in scope?**
+
+**│**
+
+**├── No**
+
+│ ↓
+
+**│ Conversation stays Unassigned**
+
+**│ Still no reply possible**
+
+**│ Surface to an authorized supervisor**
+
+**│**
+
+**└── Yes**
+
+↓
+
+**Selected Team Lead identifies the destination team**
+
+**and becomes the initial operational owner**
+
+↓
+
+**Lead created — Record Owner = selected Team Lead**
+
+↓
+
+**Conversation assigned to the same Team Lead**
+
+**(full history preserved, no new thread)**
+
+↓
+
+**Reply now permitted, per Section 89.1**
+
+**(direct assignment, not round robin;**
+
+**the assigning Admin or Manager does not become owner)**
 
 **Scheduled Renewal Reminder**
 
@@ -4799,11 +6917,11 @@ Conversation assignment/status controls may be available through
 
 ↓
 
-**Validate Customer + WhatsApp**
+**Validate Customer Purchase + WhatsApp**
 
 ↓
 
-**Validate Template / Variables**
+**Validate Template / Variables / Opt-Out**
 
 ↓
 
@@ -4815,11 +6933,11 @@ Conversation assignment/status controls may be available through
 
 │ ↓
 
-**│ Failed**
+**│ Failed or Skipped, with reason**
 
 │ ↓
 
-**│ Surface Failure**
+**│ Surface to the responsible owner**
 
 **│**
 
@@ -4845,6 +6963,8 @@ Conversation assignment/status controls may be available through
 
 **│ Customer Activity**
 
+**│ Customer Purchase reminder history**
+
 **│**
 
 **└── No**
@@ -4855,62 +6975,79 @@ Conversation assignment/status controls may be available through
 
 ↓
 
-**Surface / Retry**
+**Surface / Retry — no duplicate successful send**
 
 **Responsibility Rule**
 
 **Lead / Customer**
 
-**Record Owner: Arun**
+**Record Owner: Arun (Team Lead or Salesperson)**
 
 ↓
 
 **WhatsApp Conversation**
 
-**Assigned To: Sneha**
+**Assigned To: Sneha (Team Lead or Salesperson)**
 
 Changing Assigned To on the WhatsApp conversation does not change the
 Lead or Customer Record Owner.
 
-## 116.1 Email Communications
+An Admin or Manager who replies to, assigns or reassigns a conversation
+never becomes its owner, and never becomes the Record Owner of the
+linked Lead or Customer.
 
-The Email module allows authorized users to send business emails from CRM Lead, Customer and Renewal records.
 
-Email is an outbound communication channel in V1.
+**123. Email Communications**
+
+The Email module allows authorized users to send business emails from
+A&S Fincare Lead, Customer, Customer Purchase and Renewal records.
+
+Email is an outbound communication channel and is a **required
+functional area of V1**. It is not an optional module and cannot be
+switched off. Whether email can currently be *sent* depends on
+configuration — a verified sender and a working provider — which is a
+configuration state, not a module toggle.
 
 V1 supports:
 
 - sending an individual email from a Lead
 - sending an individual email from a Customer
+- sending an individual email relating to a Customer Purchase
 - sending a renewal reminder email
 - scheduled renewal reminder emails
 - controlled bulk renewal reminder emails
 - reusable email templates
 - template variables populated from CRM data
-- file attachments
+- policy-document and file attachments
 - email activity history on the related CRM record
 - delivery and failure status where available
 - email communication preferences and opt-out handling
 
 V1 does not include:
 
-- a shared email inbox
+- a shared inbound email inbox
 - Gmail or Outlook mailbox synchronization
+- email thread synchronization from external mailboxes
 - reading incoming replies inside the CRM
 - automatic association of incoming emails
 - email conversation assignment
-- marketing campaign management
+- marketing campaign management or a marketing automation platform
+- unrestricted mass email campaigns
 - automated sales sequences
 - audience segmentation
 - A/B testing
 - email open or click tracking
 - a complex drag-and-drop email designer
 
-Replies are delivered to the configured Reply-To address outside the CRM. They are not synchronized back into the CRM in V1.
+Replies are delivered to the configured Reply-To address outside the
+CRM. They are not synchronized back into the CRM in V1.
 
-Email functionality must remain optional. A workspace that does not enable or configure Email must continue to use the rest of the CRM normally.
+All Email behaviour is subject to the reporting hierarchy in Section 2.3
+and the fixed role behaviour in Section 2. Sending an email never
+changes who owns a record.
 
-## 116.2 Email Entry Points
+
+**124. Email Entry Points**
 
 Authorized users may initiate an individual email from:
 
@@ -4919,7 +7056,7 @@ Authorized users may initiate an individual email from:
 - Customer Header
 - Customer Profile
 - Customer Activity
-- Customer Product / Service Detail
+- Customer Purchase Detail
 - Renewals & Reminders
 
 Available actions may include:
@@ -4930,22 +7067,30 @@ Available actions may include:
 
 Email actions should appear only when:
 
-- the Email module is enabled
-- a verified sender is configured
-- the user has permission to send email
+- the related record is within the user's hierarchy scope under
+  Section 2.3
+- the user's fixed role permits the action
+- a verified A&S Fincare sender is configured
 - the related record contains a valid email address
 - the recipient is eligible to receive email
 
-Selecting an email address from a Lead or Customer record should open the CRM email composer rather than exposing configuration details.
+Selecting an email address from a Lead or Customer record should open the
+CRM email composer rather than exposing configuration details.
 
-## 116.3 Workspace Email Sender
+Hiding an entry point is presentation only. The server must authorize the
+action when it is attempted.
 
-V1 supports one active email sender identity per workspace.
+
+**125. A&S Fincare Email Sender**
+
+V1 uses one active email sender identity for A&S Fincare. There is no
+per-team, per-Manager or per-user sender.
 
 The sender configuration contains:
 
 - Sender Name
 - Sender Email Address
+- Sending Domain
 - Reply-To Address
 - Verification Status
 
@@ -4956,38 +7101,54 @@ Possible verification states:
 - Verified
 - Configuration Problem
 
-Outbound email must be sent through the server-side email service. Email provider credentials and secrets must never be exposed to the browser.
+Outbound email must be sent through the server-side email service. Email
+provider credentials and secrets must never be exposed to the browser,
+displayed in the interface, written to client-side storage or included
+in exported data.
 
-If the sender is not verified, normal email actions should be disabled and the user should see a clear explanation.
+If the sender is not verified, normal email actions are disabled and the
+user sees a clear explanation.
 
-Owner/Admin:
+Admin:
 
-**Email sending is not configured. Configure and verify a sender before sending email.**
+**Email sending is not configured. Configure and verify a sender before
+sending email.**
 
 Other users:
 
-**Email is not available for this workspace. Contact your administrator.**
+**Email is not available yet. Contact your administrator.**
 
-A missing or failed email configuration must not block unrelated CRM functionality.
+An unverified sender, or a temporarily unavailable provider, is a
+**configuration state**, not a disabled module. Email remains part of
+V1. Such a state must not block unrelated CRM functionality, and must
+never cause an unsent email to be recorded as sent.
 
-## 116.4 Email Composer
+A single shared sender does not widen visibility. Who may send, and
+which records they may send about, is determined by Section 2.3 and the
+fixed role behaviour in Section 2.
+
+
+**126. Email Composer**
 
 Selecting **Send Email** opens the email composer.
 
 Show:
 
-- From — configured workspace sender, read-only
-- Reply-To — configured workspace address, read-only
+- From — the configured A&S Fincare sender, read-only
+- Reply-To — the configured Reply-To address, read-only
 - To — prefilled from the Lead or Customer
 - Template — optional
 - Subject — required
 - Message — required
 - Attachments — optional
-- Related Record — read-only
+- Related Record — read-only, identifying the Lead, Customer or Customer
+  Purchase
 - Send
 - Cancel
 
-The recipient may be changed only to another permitted email address stored on the same CRM record. V1 does not require arbitrary recipient entry, CC or BCC.
+The recipient may be changed only to another permitted email address
+stored on the same CRM record. V1 does not require arbitrary recipient
+entry, CC or BCC.
 
 The message editor may support basic formatting:
 
@@ -4997,15 +7158,19 @@ The message editor may support basic formatting:
 - lists
 - links
 
-V1 does not require arbitrary HTML editing or a visual email-page builder.
+V1 does not require arbitrary HTML editing or a visual email-page
+builder.
 
-Before sending, the user should be able to review the recipient, subject, message and attachments.
+Before sending, the user should be able to review the recipient, subject,
+message and attachments.
 
-If the composer is closed with unsent changes, warn the user before discarding the content.
+If the composer is closed with unsent changes, warn the user before
+discarding the content.
 
-## 116.5 Email Templates
 
-Owner/Admin can create reusable Email templates.
+**127. Email Templates**
+
+Admin can create reusable Email templates.
 
 Template fields:
 
@@ -5020,8 +7185,8 @@ Example purposes:
 
 - Lead Follow-up
 - Customer Follow-up
-- Product / Service Information
-- Document Sharing
+- Plan or Policy Information
+- Policy Document Sharing
 - Renewal Reminder
 - General Communication
 
@@ -5039,30 +7204,54 @@ Actions:
 - Deactivate
 - Reactivate
 
-Deactivating a template prevents future selection but does not remove it from historical email activity.
+Deactivating a template prevents future selection but does not remove it
+from historical email activity.
 
-Templates belong to one workspace and must never be visible to another workspace.
+Templates belong to A&S Fincare and are shared across the organization.
+A template does not carry hierarchy scope of its own: what a user may
+send, and to whom, is determined by their role and the record's scope,
+not by the template.
+
+Email templates are configurable business data. Managing them does not
+change any role's visibility, ownership or authorization. See
+Section 2.6.
 
 V1 does not require template approval by the email provider.
 
-## 116.6 Email Template Variables
+
+**128. Email Template Variables**
 
 Email templates may use approved CRM variables.
 
-Examples:
+Available variables:
 
-- Customer First Name
 - Customer Full Name
-- Lead First Name
-- Lead Full Name
-- Business Name
-- Product / Service Name
-- Due Date
+- Customer First Name
+- Lead Full Name, where applicable
+- Lead First Name, where applicable
+- Product Category
+- Provider
+- Plan / Sub-product
+- Policy or Reference Number
 - Renewal Date
-- Assigned User Name
 - Record Owner Name
+- Team Lead Name, where appropriate
+- A&S Fincare business name
+- A&S Fincare contact details
 
-Before sending, the CRM should replace each variable with data from the related record.
+Variables must resolve only from data the recipient's own record
+provides. A template must never be able to pull data from a record
+outside the sending user's permitted scope.
+
+**Not permitted as variables**
+
+- the contents of a policy document
+- authentication data, tokens or credentials
+- internal identifiers that would expose other records
+- Closed Amount, incentive figures or other internal performance data
+
+Before sending, the CRM should replace each variable with data from the
+related record.
 
 If a required variable cannot be populated:
 
@@ -5073,48 +7262,78 @@ If a required variable cannot be populated:
 
 The preview must show the final resolved subject and message.
 
-## 116.7 Email Attachments
+
+**129. Email Attachments**
 
 Authorized users may attach permitted files to an individual email.
 
 Attachments may be:
 
 - uploaded from the user's device
-- selected from Customer Documents, where applicable
+- selected from the policy documents of a Customer Purchase the user is
+  permitted to view
 
-Validate attachments before sending.
+**Access rules**
 
-Validation should include:
+A user may attach a stored policy document only when they are authorized
+to view that document under Section 2.3. The attachment picker must list
+only documents within the user's permitted scope; it must never reveal
+the name, type or existence of a document belonging to a record outside
+that scope.
+
+Storage of a document does not by itself make it sendable. Each
+attachment selection is authorized server-side at the moment of sending,
+not only when the picker is rendered.
+
+V1 covers **policy-related documents**. Personal identity and KYC
+documents are outside the V1 policy-document requirement and are not
+part of this attachment flow. See Section 205.
+
+Validate attachments before sending. Validation should include:
 
 - permitted file type
-- configured file-size limit
+- configured file-size limit and provider limits
 - safe file name
 - successful upload
 - file availability
-- user access to the related document
+- the sending user's access to the related document
 
 Executable or otherwise prohibited file types must not be accepted.
 
-When an attachment is selected from Customer Documents, the original document remains part of the Customer record.
+**Effects**
 
-An attachment uploaded while emailing a Lead may be retained with the email activity entry but does not create a general Lead Documents module.
+When an attachment is selected from a Customer Purchase's policy
+documents, the original document remains part of that purchase. Emailing
+a required policy document does **not** change the purchase's
+document-completeness status and does not move it toward or away from
+`Closed/Active`. See Section 68.1.
 
-Email activity should retain attachment names and references where permitted.
+An attachment uploaded while emailing a Lead may be retained with the
+email activity entry but does not create a general Lead Documents
+module.
 
-## 116.8 Recipient Validation and Email Preference
+Email activity should retain attachment names and references. It must
+not expose provider credentials, signed private storage URLs or any
+value that would let an unauthorized reader retrieve the file.
+
+Final action-level rules for which roles may attach stored policy
+documents are *pending client confirmation before security
+implementation and UAT*.
+
+
+**130. Recipient Validation and Email Preference**
 
 Before sending, validate:
 
 - the related record exists
-- the user can access the record
-- the user has email permission
-- the Email module is enabled
-- the workspace sender is verified
+- the user can access the record under the reporting hierarchy
+- the user's fixed role permits the Email action
+- the A&S Fincare sender is verified
 - the recipient email address is present
 - the recipient email address has a valid format
 - the recipient is not marked Email Opted Out
 - required template variables are available
-- attachments are valid and accessible
+- attachments are valid, accessible and permitted for that user
 
 Lead and Customer records should support:
 
@@ -5127,22 +7346,29 @@ When Email Opted Out is enabled:
 - individual email actions should be disabled
 - existing email history must remain visible
 
-An authorized user may update the preference. The change should be recorded in CRM Activity with the user and date.
+An authorized user may update the preference. The change should be
+recorded in CRM Activity with the user and date, and is auditable.
 
-The system must not automatically remove an opt-out without an authorized user action.
+The system must not automatically remove an opt-out without an
+authorized user action.
 
-## 116.9 Sending an Individual Email
+
+**131. Sending an Individual Email**
 
 When the user selects **Send**:
 
-1. Revalidate authentication, workspace access and permission on the server.
-2. Revalidate the recipient, template variables and attachments.
-3. Create an Email send record linked to the Lead or Customer.
+1. Revalidate authentication, hierarchy scope for the related record and
+   fixed role behaviour on the server.
+2. Revalidate the recipient, opt-out state, template variables and
+   attachment access.
+3. Create an Email send record linked to the Lead, Customer or Customer
+   Purchase.
 4. Submit the email through the configured server-side provider.
 5. Record the result.
 6. Add the activity to the related CRM timeline.
 
-The Send button should prevent accidental repeated submissions while processing.
+The Send button should prevent accidental repeated submissions while
+processing.
 
 A successful send should show:
 
@@ -5160,7 +7386,10 @@ If sending fails:
 - allow a permitted user to retry
 - do not create duplicate successful sends during retry
 
-## 116.10 Email Status
+Sending an email does not change the Record Owner of the related record.
+
+
+**132. Email Status**
 
 Possible Email statuses:
 
@@ -5174,7 +7403,8 @@ Definitions:
 
 **Queued**
 
-The CRM accepted the request and is waiting to submit it to the email provider.
+The CRM accepted the request and is waiting to submit it to the email
+provider.
 
 **Sent**
 
@@ -5190,17 +7420,26 @@ The CRM or provider could not send the email.
 
 **Bounced**
 
-The provider reported that the recipient address did not accept the email.
+The provider reported that the recipient address did not accept the
+email.
 
-The CRM must not describe an email as Delivered unless the provider has confirmed delivery.
+The CRM must not describe an email as Delivered unless the provider has
+confirmed delivery.
 
-Sent or Delivered does not mean that the recipient opened or read the email.
+A Failed or Bounced email must never be displayed, counted or reported
+as Sent or Delivered, in any list, total, activity row, notification or
+export.
+
+Sent or Delivered does not mean that the recipient opened or read the
+email.
 
 V1 does not include open tracking or click tracking.
 
-## 116.11 Email History in CRM Records
 
-Sent and attempted emails should appear in the related Lead or Customer Activity timeline.
+**133. Email History in CRM Records**
+
+Sent and attempted emails should appear in the related Lead, Customer or
+Customer Purchase Activity timeline.
 
 Show:
 
@@ -5211,7 +7450,7 @@ Show:
 - Message
 - Attachment Names
 - Sent By
-- Related Product / Service, where applicable
+- Related Customer Purchase, where applicable
 - Failure Reason, where applicable
 
 Example:
@@ -5220,36 +7459,55 @@ Example:
 
 **Email sent by Meera**
 
-**Subject: Health Insurance Renewal**
+**Subject: Family Health Optima Renewal**
 
 **To: anjali@example.com**
 
 Selecting the activity opens the permitted email details.
 
-Email history follows the same record visibility and workspace-isolation rules as the related Lead or Customer.
+**Visibility**
 
-Users must not access email content for CRM records they are not permitted to view.
+Email history follows the hierarchy visibility of the related record
+under Section 2.3:
+
+- a Salesperson sees Email history for the records assigned to them
+- a Team Lead sees their own and their team's permitted records
+- a Manager sees records below them in their reporting hierarchy
+- Admin sees the organization
+
+Peer Managers and peer Team Leads must not see one another's Email
+history. Search results, counts, previews, notifications and exports
+obey the same scope. Users must not access email content for records
+they are not permitted to view, and this must be enforced server-side.
+
+**Sent By is not ownership**
+
+The **Sent By** user is the person who sent the email. It is a separate
+fact from the record's Record Owner. An Admin or Manager appearing as
+Sent By does not own the record.
 
 Email activity is historical data and must not be deleted when:
 
 - a template is deactivated
 - a user is deactivated
-- the Email module is disabled
-- a Lead or Customer is archived
+- a Lead, Customer or Customer Purchase is archived
 
-## 116.12 Scheduled Email Renewal Reminder
 
-Email may be selected as a reminder channel for a Customer Product / Service with a Due Date.
+**134. Scheduled Email Renewal Reminder**
+
+Email is a reminder channel for a **Customer Purchase** with a Renewal
+Date. Automatic renewal reminders are required in V1, as defined in
+Section 195.1.
 
 When the scheduled reminder time is reached, validate:
 
-- the Customer still exists and is eligible
+- the Customer and Customer Purchase still exist and are eligible
 - the Customer has a valid email address
 - Email Opted Out is not enabled
-- the Email module is enabled
-- the workspace sender remains verified
+- the A&S Fincare sender remains verified
 - an active Email template is available
-- required variables can be populated
+- required variables can be populated, including Provider,
+  Plan/Sub-product, Policy Number and Renewal Date
 - the reminder instance has not already been sent
 
 If successful:
@@ -5257,41 +7515,70 @@ If successful:
 - send the email
 - mark the reminder instance Sent
 - record the email in Customer Activity
-- retain it in Product / Service reminder history
+- retain it in the Customer Purchase's reminder history
 
 If unsuccessful:
 
 - do not silently skip the reminder
 - mark the reminder instance Failed
 - store the available failure reason
-- notify the appropriate user
+- notify the responsible owner
 - allow an authorized user to retry or use another permitted action
 
-The system must prevent the same reminder instance from being sent twice because of a retry, refresh or repeated background-job execution.
+A reminder that cannot be attempted at all — for example because the
+recipient has opted out — is recorded as skipped with a safe reason. It
+is never recorded as sent.
 
-## 116.13 Manual Email Renewal Reminder
+The system must prevent the same reminder instance from being sent twice
+because of a retry, refresh or repeated background-job execution.
+
+Exact schedules, template content, escalation rules, retry timing and
+channel precedence between WhatsApp and Email remain *pending client
+confirmation*.
+
+
+**135. Manual Email Renewal Reminder**
 
 From Renewals & Reminders, an authorized user may select:
 
 **Send Email Reminder**
 
-This is an immediate send action and is different from scheduling a future reminder.
+This is an immediate send action for a Customer Purchase within the
+user's permitted scope. It is different from scheduling a future
+reminder, and sending one does not cancel or replace a scheduled
+reminder.
 
-The recipient, template, variables and attachments should be reviewed before sending.
+The recipient, template, variables and attachments should be reviewed
+before sending.
 
 A successful manual email reminder should be recorded in:
 
 - Email History
 - Customer Activity
-- relevant Product / Service reminder history
+- the Customer Purchase's reminder history
 
-A manual email reminder follows the same eligibility, permission and validation rules as other outbound emails.
+A manual email reminder follows the same eligibility, hierarchy scope,
+role behaviour and validation rules as other outbound emails. A failed
+manual send is recorded as failed with the available reason and is never
+presented as successful.
 
-## 116.14 Controlled Bulk Email Reminder
 
-Authorized users may send the same Email template to multiple selected renewal records.
+**136. Controlled Bulk Email Reminder**
 
-Bulk Email in V1 is available only from Renewals & Reminders. It is not a general marketing campaign feature.
+Authorized users may send the same Email template to multiple selected
+renewal records.
+
+Bulk Email in V1 is available only from Renewals & Reminders. It is not
+a general marketing campaign feature and does not support unrestricted
+mass Email.
+
+**Selection scope**
+
+Selection is limited to Customer Purchases within the sender's hierarchy
+scope under Section 2.3. A user can never select, count, preview or send
+to a record they cannot otherwise see. Selection totals, eligibility
+counts and exclusion reasons must be computed only over records in
+scope, so that no figure reveals activity in a peer branch or team.
 
 Before sending, validate each selected record separately.
 
@@ -5350,39 +7637,78 @@ After processing, show:
 
 **[Done]**
 
-The user should be able to identify affected records and the reason for each failure or exclusion.
+The user should be able to identify affected records and the reason for
+each failure or exclusion.
+
+**Per-recipient outcome and retry**
+
+Each recipient's outcome is recorded individually. A retry must reattempt
+only the recipients that failed; recipients already sent successfully
+must never be sent again by a retry. A failed or excluded recipient must
+never be reported as sent.
+
+Bulk Email activity is auditable, including who initiated it, the
+template used, the recipients attempted and each outcome.
 
 V1 does not include campaign analytics beyond operational send results.
 
-## 116.15 Email Permission Behaviour
+Which roles may initiate controlled bulk Email is *pending client
+confirmation before security implementation and UAT*.
 
-Email actions must follow the role and permission rules defined under Settings → Roles & Permissions.
 
-Permissions should distinguish between:
+**137. Email Permission Behaviour**
+
+Email actions follow the fixed role behaviour defined in Section 2. Role
+capabilities are not configurable in the CRM.
+
+Two conditions must both hold before any Email action:
+
+> 1. the user's fixed role permits the action; and
+>
+> 2. the related Lead, Customer or Customer Purchase falls within the
+> user's hierarchy scope under Section 2.3.
+
+Permissions distinguish between:
 
 - sending individual emails
 - sending manual renewal emails
 - sending controlled bulk renewal emails
 - creating and managing Email templates
-- configuring the workspace Email sender
-
-Users should not see or execute actions they do not have permission to perform.
+- configuring the A&S Fincare Email sender
 
 Every server-side email operation must independently enforce:
 
 - authenticated user
-- workspace isolation
-- related-record access
-- role permission
-- recipient eligibility
+- related-record access under the reporting hierarchy
+- fixed role behaviour
+- recipient eligibility and opt-out state
+- attachment access
 
-Hiding an Email button in the user interface is not sufficient authorization.
+Hiding an Email button in the user interface is not sufficient
+authorization. Composing, previewing an attachment, sending, resending
+and viewing Email history must each be authorized on the server.
 
-## 116.16 Email Empty, Loading and Error States
+Sending an Email never transfers ownership of the Lead, Customer or
+Customer Purchase. An Admin or Manager who sends an Email within their
+permitted scope does not become the record's owner.
 
-**Email not configured**
+**Pending**
 
-**Email sending is not configured for this workspace.**
+Which roles may send individual Email, manual Email renewal reminders
+and controlled bulk Email reminders is *pending client confirmation
+before security implementation and UAT*, and is listed in Sections 188
+and 212. These are fixed application behaviours once confirmed, not
+settings an Admin can configure.
+
+
+**138. Email Empty, Loading and Error States**
+
+**Email sender not configured**
+
+**Email sending is not configured yet.**
+
+This is a configuration state, not a disabled module. The rest of the
+CRM remains fully usable.
 
 **Recipient missing**
 
@@ -5396,29 +7722,49 @@ Hiding an Email button in the user interface is not sufficient authorization.
 
 **Email communication is disabled for this recipient.**
 
+**No active template**
+
+**No active template is available for this reminder.**
+
+**Provider temporarily unavailable**
+
+**Email cannot be sent right now. The message has not been sent.**
+
+**\[ Try Again \]**
+
+A provider outage must never be presented as a successful send, and must
+not block unrelated CRM functionality.
+
 **Loading**
 
 Use a clear composer or email-history loading state.
 
 **Send failure**
 
-Keep the user's subject, message and attachment selection where possible and explain that the email was not sent.
+Keep the user's subject, message and attachment selection where possible
+and explain that the email was not sent.
 
 **History failure**
 
 **Unable to load Email history.**
 
-**[Try Again]**
+**\[ Try Again \]**
 
 Do not display an empty table without an explanation.
 
-## 116.17 Email Mobile Behaviour
+An empty or restricted state must never disclose the existence of Email
+activity on records outside the viewer's permitted scope. "No Email
+history" means none within that user's scope.
+
+
+**139. Email Mobile Behaviour**
 
 Mobile users may:
 
-- send an individual email from a permitted Lead or Customer
+- send an individual email from a permitted Lead, Customer or Customer
+  Purchase
 - use an Email template
-- add permitted attachments from the phone
+- attach a permitted policy document
 - send a manual renewal reminder
 - view Email activity on a permitted CRM record
 
@@ -5430,13 +7776,28 @@ The mobile composer should:
 - support the phone's file-selection interface
 - retain unsent content when a recoverable error occurs
 
-Workspace Email configuration, template administration and bulk Email sending remain web-first.
+Mobile enforces exactly the same hierarchy scope and role behaviour as
+desktop. A narrower screen never widens what a user can see or send.
 
-## 116.18 Email Flow Summary
+A small screen must not hide:
+
+- the recipient address actually being used
+- opt-out state
+- delivery status, including Failed and Bounced
+- the reason an Email could not be sent
+- which attachments are included
+
+These may be condensed, but never omitted.
+
+Email sender configuration, template administration and controlled bulk
+Email sending remain web-first.
+
+
+**140. Email Flow Summary**
 
 **Individual Email**
 
-**Lead / Customer**
+**Lead / Customer / Customer Purchase**
 
 ↓
 
@@ -5444,7 +7805,7 @@ Workspace Email configuration, template administration and bulk Email sending re
 
 ↓
 
-**Validate User + Workspace + Permission**
+**Validate User + Hierarchy Scope + Role**
 
 ↓
 
@@ -5476,7 +7837,7 @@ Workspace Email configuration, template administration and bulk Email sending re
 
 ↓
 
-**Validate Customer + Email Eligibility**
+**Validate Customer Purchase + Email Eligibility**
 
 ↓
 
@@ -5494,12 +7855,17 @@ Workspace Email configuration, template administration and bulk Email sending re
 **Sent Successfully?**
 
 - **Yes:** Reminder = Sent, Email History and Customer Activity updated
-- **No:** Reminder = Failed, reason stored and responsible user notified
+- **No:** Reminder = Failed, reason stored and the responsible owner
+  notified
 
-**117. Data Import & Export**
+Sending an Email never changes the Record Owner of the Lead, Customer or
+Customer Purchase, and never makes a supervisory sender an owner.
 
-The CRM should allow authorized users to import existing Lead and
-Customer data and export permitted CRM data when required.
+
+**141. Data Import & Export**
+
+Authorized users may import existing Lead and Customer data, and export
+permitted CRM data.
 
 V1 supports:
 
@@ -5507,7 +7873,9 @@ V1 supports:
 >
 > • Customer import
 >
-> • simple field mapping
+> • field mapping
+>
+> • an explicit Lead assignment step
 >
 > • validation before import
 >
@@ -5519,7 +7887,7 @@ V1 supports:
 >
 > • downloadable error report
 >
-> • basic export of Leads and Customers
+> • export of Leads, Customers and Customer Purchases
 
 V1 does not include:
 
@@ -5533,7 +7901,11 @@ V1 does not include:
 >
 > • API-based bulk data migration tools
 
-**118. Import Entry Points**
+Import and export are bounded by the reporting hierarchy in
+Section 2.3. An import can only place records where the importing user
+is permitted to assign them, and an export can only return records the
+requesting user is permitted to see.
+**142. Import Entry Points**
 
 Import may be started from:
 
@@ -5543,11 +7915,12 @@ Import may be started from:
 >
 > • Settings → Data Import / Export
 
-The onboarding import step should also open the same import workflow.
+The setup import step opens the same import workflow.
 
-Import functionality should be available only to authorized users.
-
-**119. Supported Import File**
+Import is available only to roles whose fixed capabilities permit it, and
+an importing user can only assign records within their own permitted
+scope. See Sections 152 and 166.
+**143. Supported Import File**
 
 V1 should support:
 
@@ -5570,17 +7943,40 @@ Upload a CSV or Excel file containing your customer data.
 The sample file should contain the standard CRM fields expected for that
 record type.
 
-**120. Import Workflow**
+**144. Import Workflow**
 
-The import flow should be:
+The import flow is:
 
-Upload File → Map Columns → Validate → Review → Import → Results
+> 1. **Upload file**
+>
+> 2. **Map columns**
+>
+> 3. **Choose Lead assignment**
+>
+> 4. **Validate**
+>
+> 5. **Resolve issues**
+>
+> 6. **Confirm**
+>
+> 7. **Process**
+>
+> 8. **Results**
 
-The system should not import records immediately after file upload.
+The system must not import records immediately after file upload.
 
-The user must be able to review how columns will be interpreted first.
+The user must be able to review how columns will be interpreted, and
+must choose how the records will be assigned, before any record is
+created.
 
-**121. Step 1 — Upload File**
+The assignment step sits after column mapping and before validation, so
+that validation can check the chosen assignment is actually usable. It is
+defined in Section 152.
+
+An import can never bypass duplicate detection, row validation,
+hierarchy-safe assignment, the policy-document requirements in
+Section 68.1, or the Closed Amount eligibility rules in Section 68.3.
+**145. Step 1 — Upload File**
 
 Example:
 
@@ -5614,7 +8010,7 @@ If the file cannot be read:
 
 > **Unable to read this file. Please upload a valid CSV or Excel file.**
 
-**122. Step 2 — Column Mapping**
+**146. Step 2 — Column Mapping**
 
 The CRM should attempt to automatically match obvious column names.
 
@@ -5667,7 +8063,7 @@ Options should include:
 A CRM field should not normally be mapped from multiple file columns
 unless explicitly supported.
 
-**123. Required Field Mapping**
+**147. Required Field Mapping**
 
 The mapping screen must clearly indicate mandatory fields.
 
@@ -5689,9 +8085,10 @@ Example:
 
 > Customer Name has not been mapped.
 
-**124. Record Owner Mapping**
+**148. Record Owner Mapping**
 
-Imported data may contain a staff/owner column.
+Imported data may contain an owner column naming the person who handles
+each record.
 
 Example:
 
@@ -5704,29 +8101,47 @@ Example:
 
 Arun → Arun Mathew
 
-If the value cannot be matched:
+**Eligibility of a matched owner**
 
-> **Record Owner "Joseph K" could not be matched to an active CRM
+A matched owner is accepted only if all of the following hold:
+
+> • the user is active
+>
+> • the user is a **Team Lead or Salesperson** — an Admin or Manager is
+> never an acceptable Record Owner
+>
+> • the user is within the importing user's permitted scope under
+> Section 2.3
+
+If the value cannot be matched, or the matched user is not eligible:
+
+> **Record Owner "Joseph K" could not be matched to an eligible active
 > user.**
 
 The user should be able to choose:
 
-> • map it to an existing user
+> • map it to an eligible user within their permitted scope
 >
 > • leave those records Unassigned, where permitted
 >
-> • use a default Record Owner
+> • fall back to the assignment strategy chosen in Step 3
 
 The import process must not automatically create new users from
-spreadsheet values.
+spreadsheet values, and must not reveal users outside the importing
+user's scope in its matching suggestions.
 
-**125. Lead Stage Mapping**
+Where a row's mapped owner is eligible, it takes precedence over the
+Step 3 assignment strategy for that row. Rows without an eligible mapped
+owner follow the Step 3 strategy.
+
+**149. Lead Stage and Lead Priority Mapping**
+
+**Lead Stage**
 
 For Lead imports, an uploaded Stage column may be mapped to the CRM Lead
 Stage field.
 
-Imported values should be matched against currently active pipeline
-stages.
+Imported values are matched against currently active pipeline stages.
 
 Example:
 
@@ -5739,45 +8154,98 @@ Follow Up → No matching stage
 For unmatched values, allow the user to map them to an existing active
 stage.
 
-The import process should not create new pipeline stages automatically.
+The import process must not create new pipeline stages automatically.
 
 If no Stage column is supplied, imported Leads use the first active
 pipeline stage.
 
-**126. Product / Service Mapping**
+**Lead Priority**
 
-If an imported Lead contains a Product/Service Interested In value, the
-CRM should attempt to match it to an existing Product/Service
-definition.
+An uploaded Priority column may be mapped to the Lead Priority field.
 
-For Customer import, basic Customer information can be imported
-independently of Customer Product/Service records.
+Imported values are matched against the active Lead Priority values
+configured in Section 192. In the initial configuration these are Hot,
+Warm and Cold.
 
-V1 should **not attempt to interpret arbitrary product, policy, renewal
-and service columns into complex Customer Product/Service records during
-the basic Customer import unless the import specifically supports that
-structure.**
+Example:
 
-This keeps the basic import predictable.
+Hot → Hot
 
-**127. Custom Field Mapping**
+High → No matching priority value
 
-Configured custom Lead or Customer fields should appear in the mapping
-options.
+For unmatched values, allow the user to map them to an existing active
+value. The import must not create new priority values automatically.
+
+If no Priority column is supplied, imported Leads receive the configured
+default priority value.
+
+**Stage and Priority are separate fields**
+
+A single uploaded column cannot populate both. Mapping a column to Stage
+does not set Priority, and mapping a column to Priority does not set
+Stage.
+**150. Product Interest Mapping**
+
+If an imported Lead contains an "Interested In" value, the CRM should
+attempt to match it against the catalogue defined in Section 66, at
+whichever level the value corresponds to:
+
+> • Product Category — for example Health Insurance
+>
+> • Provider — for example Star Health
+>
+> • Plan / Sub-product — for example Family Health Optima
+
+Only active catalogue entries are matched. Unmatched values are flagged
+for the user to map or leave empty. The import must not create new
+Product Categories, Providers or Plans automatically.
+
+**A Lead import never creates a Customer Purchase**
+
+An imported Lead records an expression of interest only. A Lead import
+must not create a Customer, a Customer Purchase, a policy record or a
+Closed Amount, and must not produce anything in a `Closed/Active` state.
+
+For Customer import, basic Customer information is imported
+independently of Customer Purchases.
+
+V1 does **not** attempt to interpret arbitrary product, policy, premium
+and renewal columns into Customer Purchases during a basic Customer
+import unless the import specifically supports that structure.
+
+Where Customer Purchases are imported by a structure that does support
+them, the import cannot bypass the rules that govern them:
+
+> • required policy documents are still required before a purchase can
+> become `Closed/Active`
+>
+> • an imported purchase cannot arrive already `Closed/Active` on the
+> strength of a spreadsheet column
+>
+> • Closed Amount eligibility still depends on `Closed/Active`
+>
+> • purchase ownership is still restricted to a Team Lead or
+> Salesperson
+
+This keeps the import predictable and prevents it from becoming a route
+around the closure and eligibility rules in Sections 68.1 and 68.3.
+**151. Custom Field Mapping**
+
+Configured custom Lead, Customer and Customer Purchase fields appear in
+the mapping options for the matching record type, as defined in
+Section 194.
 
 Example:
 
 **Uploaded:**
 
-**Vehicle Number**
+**Existing Policy Number**
 
 **CRM:**
 
-**Vehicle Number — Custom Field**
+**Existing Policy Number — Custom Field**
 
-Field values should be validated according to the custom field type.
-
-Examples:
+Field values are validated according to the custom field type:
 
 > • Number must contain a valid numeric value
 >
@@ -5785,7 +8253,80 @@ Examples:
 >
 > • Dropdown must match an allowed option or be flagged for review
 
-**128. Step 3 — Validation**
+Only custom fields defined for the record type being imported are
+offered. A Lead import cannot map to a Customer or Customer Purchase
+custom field.
+**152. Step 3 — Choose Lead Assignment**
+
+Before validation, the importing user must choose how the imported
+records will be assigned. There is no default and no implicit strategy.
+
+**Options**
+
+> • **Assign to a specific Team Lead** — every imported record is owned
+> by that Team Lead.
+>
+> • **Assign to a specific Salesperson** — every imported record is
+> owned by that Salesperson.
+>
+> • **Assign to a Team** — records are distributed using that team's
+> configured round robin.
+
+The Team Leads, Salespersons and teams offered are limited to those the
+importing user is permitted to assign to under Section 2.3: a Team Lead
+may assign within their own team, a Manager within their own reporting
+hierarchy, and an Admin anywhere in the organization. The option list
+must not disclose a user or team the importing user cannot otherwise see.
+
+**When a Team is selected**
+
+> • the team's configured round robin is used, as defined in
+> Section 189.1
+>
+> • the eligible pool is that team's **active Team Lead and active
+> Salespersons**
+>
+> • the team's configured **batch size** applies
+>
+> • Admin and Manager are never included in the pool
+>
+> • records never spill into another team
+>
+> • if the team has no eligible active recipient, the strategy is
+> invalid and the import cannot proceed on it
+
+**Direct assignment**
+
+Assigning to a specific Team Lead or Salesperson must respect hierarchy
+and role eligibility. The selected user must be active, must be a Team
+Lead or Salesperson, and must be within the importing user's permitted
+scope.
+
+**No generic fallback**
+
+There is no "use CRM assignment rules" option. Assignment during import
+is always an explicit choice of a team or an individual, because there is
+no organization-wide default assignment rule to fall back on.
+
+**Interaction with a mapped owner column**
+
+Where the file contains an owner column and a row's owner matches an
+eligible user, that row uses its mapped owner. All other rows follow the
+strategy chosen here. See Section 148.
+
+**Visibility of the choice**
+
+The selected strategy must be shown again:
+
+> • on the review summary — Section 154
+>
+> • on the confirmation screen — Section 158
+>
+> • in the import result and its audit summary — Sections 160 and 161
+
+Import execution and the assignment strategy used are auditable. See
+Section 208.
+**153. Step 4 — Validation**
 
 Before import, validate each row.
 
@@ -5799,13 +8340,40 @@ Possible validation issues include:
 >
 > • invalid date
 >
-> • unknown Record Owner
+> • unknown or ineligible Record Owner
+>
+> • Record Owner outside the importing user's permitted scope
+>
+> • Record Owner who is an Admin or Manager
 >
 > • unknown pipeline stage
+>
+> • unknown Lead Priority value
+>
+> • unmatched Product Category, Provider or Plan/Sub-product
 >
 > • invalid custom field value
 >
 > • possible duplicate
+
+**Assignment validation**
+
+Validation also checks the assignment strategy chosen in Step 3:
+
+> • the selected Team Lead or Salesperson is still active and still
+> within the importing user's permitted scope
+>
+> • the selected team still has at least one eligible active recipient
+>
+> • no row would be assigned to an Admin or a Manager
+>
+> • no row would be assigned outside the selected team
+
+If the assignment strategy itself is invalid — for example the selected
+team has no eligible active recipient — the import cannot proceed on that
+strategy. The user must choose a different one. The import must not fall
+back to a different team, to the importing user, or to any Admin or
+Manager.
 
 Validation should classify rows as:
 
@@ -5816,10 +8384,10 @@ Validation should classify rows as:
 > **• Duplicate**
 >
 > **• Cannot Import**
+**154. Step 5 — Import Review Summary**
 
-**129. Import Review Summary**
-
-Before confirming the import, show a summary.
+Before confirming the import, show a summary of both the rows and the
+chosen assignment.
 
 Example:
 
@@ -5833,9 +8401,19 @@ Example:
 
 **8 Cannot Import**
 
+**Assignment: Team → Kochi Health Team (round robin, batch size 1)**
+
+**Eligible recipients: Arun (Team Lead), Sneha, Joseph**
+
+Where individual rows carry an eligible mapped owner, the summary should
+also show how many rows will use their mapped owner and how many will
+follow the chosen strategy.
+
 Actions:
 
 **Review Issues**
+
+**Change Assignment**
 
 **Import Valid Rows**
 
@@ -5844,7 +8422,11 @@ Actions:
 The system should not force the user to fix every invalid row before
 importing valid records.
 
-**130. Duplicate Detection During Import**
+If the chosen assignment strategy is itself invalid, **Import Valid
+Rows** is unavailable until a usable strategy is selected. See
+Section 153.
+
+**155. Duplicate Detection During Import**
 
 Duplicate detection should use the same basic rules used when manually
 creating Leads or Customers.
@@ -5861,7 +8443,7 @@ Where a possible duplicate exists, classify the row as:
 
 The CRM should not silently overwrite the existing record.
 
-**131. Duplicate Handling Options**
+**156. Duplicate Handling Options**
 
 Before import, authorized users may choose how possible duplicates are
 handled.
@@ -5884,7 +8466,7 @@ good CRM data and is outside the simple V1 import flow.
 
 The user can review existing records separately.
 
-**132. Invalid Rows**
+**157. Invalid Rows**
 
 Rows that cannot be imported should not prevent valid rows from being
 processed.
@@ -5935,15 +8517,20 @@ John Thomas
 
 Unknown Record Owner
 
-**133. Import Confirmation**
+**158. Step 6 — Import Confirmation**
 
-Before the actual import begins, show a confirmation.
+Before the actual import begins, show a confirmation that restates both
+the record count and the assignment strategy.
 
 Example:
 
-**Import 390 Customers?**
+**Import 390 Leads?**
 
-This will create new Customer records in this workspace.
+This will create new Lead records.
+
+**Assignment: Team → Kochi Health Team (round robin, batch size 1)**
+
+**Eligible recipients: Arun (Team Lead), Sneha, Joseph**
 
 **18 possible duplicates will be skipped.**
 
@@ -5951,9 +8538,12 @@ This will create new Customer records in this workspace.
 
 **\[ Cancel \]**
 
-Import is considered a major data action and requires confirmation.
+The assignment strategy chosen in Step 3 must be shown again here. A
+user must never confirm a large import without seeing where the records
+will go.
 
-**134. Import Processing**
+Import is considered a major data action and requires confirmation.
+**159. Step 7 — Import Processing**
 
 After the import starts, the system should process the data without
 requiring the user to keep the page open.
@@ -5974,7 +8564,7 @@ The system should not create duplicate records if the user refreshes or
 accidentally revisits the import result while the same import job is
 already processing.
 
-**135. Import Result**
+**160. Step 8 — Import Result**
 
 On completion:
 
@@ -5988,6 +8578,10 @@ Example:
 
 **12 Failed**
 
+**Assignment: Team → Kochi Health Team (round robin, batch size 1)**
+
+**Distributed to: Arun 130 · Sneha 130 · Joseph 130**
+
 Actions:
 
 **View Imported Records**
@@ -5996,10 +8590,17 @@ Actions:
 
 **Done**
 
+The result must state the assignment strategy that was applied and how
+the records were distributed, so the outcome can be verified against
+what was confirmed.
+
 The result should remain available long enough for the user to review
 the outcome.
 
-**136. Import History**
+Import execution, including the assignment strategy used, is auditable.
+See Section 208.
+
+**161. Import History**
 
 Authorized users should be able to view recent imports under:
 
@@ -6013,15 +8614,19 @@ Example:
 
 **User**
 
+**Assignment**
+
 **Date**
 
 **Result**
 
-customers-september.xlsx
+september-leads.xlsx
 
-Customers
+Leads
 
 Admin
+
+Team → Kochi Health Team
 
 03 Sep
 
@@ -6033,17 +8638,26 @@ Leads
 
 Arun
 
+Salesperson → Sneha
+
 29 Aug
 
 118 Imported
 
-Selecting an entry shows the import summary.
+Each entry records the **assignment strategy used**, so it is always
+possible to see how an import distributed its records.
+
+Selecting an entry shows the import summary, including the assignment
+outcome and any failures.
+
+Import history is visible within the viewer's authorized scope. Import
+execution and its assignment strategy are auditable. See Section 208.
 
 V1 does not require detailed audit analytics for every imported cell.
+**162. Export**
 
-**137. Export**
-
-Authorized users may export permitted Lead or Customer data.
+Authorized users may export permitted Lead, Customer or Customer
+Purchase data.
 
 Export may be available from:
 
@@ -6057,24 +8671,72 @@ Actions:
 
 **Export**
 
-The export should respect:
+**Scope of an export**
 
-> • current user permissions
+An export returns only the records within the requesting user's
+authorized scope under Section 2.3:
+
+> • **Admin** — organization-wide, where their role permits export
 >
+> • **Manager** — their own reporting hierarchy only
+>
+> • **Team Lead** — their own team and their own records
+>
+> • **Salesperson** — their own permitted records
+
+An export must never expose a peer Manager's branch, a peer Team Lead's
+team, or any record the user could not open in the interface. Scope is
+applied server-side when the file is generated. It is not achieved by
+producing a wider dataset and filtering it afterwards.
+
+The export also respects:
+
 > • active filters where applicable
+>
+> • the fields the user is permitted to see
 
 For example, if the Customers list is filtered to:
 
 **Record Owner = Arun**
 
-the user may export those filtered results.
+the user may export those filtered results, provided Arun is within
+their scope.
 
-**138. Export Fields**
+Every export is recorded, identifying the requesting user, the dataset,
+the filters and the scope applied. See Section 208.
 
-V1 exports should include relevant standard fields and permitted
-configured custom fields.
+Which roles may export is *pending client confirmation*. See
+Section 166.
+**163. Export Fields**
 
-Customer example:
+V1 exports include relevant standard fields and permitted configured
+custom fields, limited to the requesting user's authorized scope.
+
+**Lead export**
+
+> • Lead Name
+>
+> • Phone
+>
+> • Email
+>
+> • Lead Priority
+>
+> • Stage
+>
+> • Lead Source
+>
+> • Interested In — Product Category, Provider or Plan/Sub-product
+>
+> • Record Owner
+>
+> • Team
+>
+> • Created Date
+>
+> • permitted custom Lead fields
+
+**Customer export**
 
 > • Customer Name
 >
@@ -6084,91 +8746,137 @@ Customer example:
 >
 > • Record Owner
 >
+> • Team
+>
 > • Created Date
 >
-> • custom Customer fields
+> • number of Customer Purchases
+>
+> • permitted custom Customer fields
 
-Lead example:
+**Customer Purchase export**
 
-> • Lead Name
+Customer Purchase data must not be flattened into the basic Customer
+export in an ambiguous way. Where purchase-level data is required it is
+treated as a **separate dataset**, with one row per purchase:
+
+> • Customer Name
 >
-> • Phone
+> • Product Category
 >
-> • Email
+> • Provider
 >
-> • Product / Service Interested In
+> • Plan / Sub-product
 >
-> • Stage
+> • Policy / Reference Number
+>
+> • Status, including `Closed/Active`
+>
+> • required-document completeness — present or missing counts only
+>
+> • Closed Amount
+>
+> • whether that Closed Amount is eligible
+>
+> • Renewal Date
 >
 > • Record Owner
 >
-> • Lead Source
+> • Team
 >
-> • Created Date
->
-> • custom Lead fields
+> • permitted custom Customer Purchase fields
 
-Customer Product/Service data should not be flattened into the basic
-Customer export in an ambiguous way.
+No export includes policy document files or their contents. See
+Section 165.
 
-If Product/Service export is required, it should be treated as a
-separate dataset.
-
-**139. Export Format**
+Every exported dataset is bounded by the requesting user's scope. A
+Customer who holds purchases owned by users outside that scope appears
+with only the purchases the requester may see.
+**164. Export Format**
 
 **V1 export format: CSV**
 
 The exported file should use clear column headings corresponding to CRM
 field names.
-
-**140. Export Confirmation / Sensitive Data**
+**165. Export Confirmation / Sensitive Data**
 
 Normal exports do not need repeated confirmation dialogs unless they
 contain a large volume of sensitive or restricted data.
 
 However:
 
-> • only authorized roles may export
+> • only roles whose fixed capabilities permit export may export
 >
-> • users may export only records and fields they are permitted to
-> access
+> • users may export only records and fields within their authorized
+> scope under Section 2.3
 
-The detailed export permission will be defined under **Roles &
-Permissions**.
+**Policy documents**
 
-**141. Import / Export Permission Behaviour**
+Exports in V1 contain **record data only**. A CSV export does not
+include policy document files, their contents, or any link that would
+let an unauthorized reader retrieve them. An export may indicate that a
+required document is present or missing, because that is a status of the
+Customer Purchase, but it does not carry the document itself.
 
-The detailed permission matrix will be defined later under:
+Whether any bulk export of policy documents should exist at all, and
+under what authorization, is *pending client confirmation*. It must not
+be implemented on assumption. See Section 212.
 
-Settings → Users → Roles & Permissions
+**Closed Amount and incentive data**
 
-At minimum:
+Where an export includes Closed Amount or incentive figures, it is
+subject to the same scope rules as the corresponding report. An export
+must never reveal a peer branch's or peer team's figures.
 
-**Owner/Admin**
+The export permission itself is part of the fixed role model. See
+Section 166.
+**166. Import / Export Permission Behaviour**
 
-> • import Leads
+Import and export follow the fixed role model in Section 2 and the
+hierarchy scope in Section 2.3. Role capabilities are not configurable in
+the CRM.
+
+Two conditions must both hold for any import or export:
+
+> 1. the user's fixed role permits the action; and
 >
-> • import Customers
+> 2. the records involved fall within the user's authorized scope.
+
+**Confirmed behaviour**
+
+> • An export returns only records within the requesting user's
+> authorized scope, as defined in Section 162. This holds for every
+> role, including Admin, whose scope happens to be the organization.
 >
-> • export permitted/all CRM data
+> • An import may assign only to Team Leads and Salespersons the
+> importing user is permitted to assign to, as defined in Section 152.
+>
+> • No import or export may produce or reveal a record owned by an
+> Admin or a Manager, or belonging to a team the user cannot see.
+>
+> • Import and export controls are hidden where the user's role does not
+> permit them, but hiding is presentation only. The server must enforce
+> both the role check and the scope check.
+>
+> • Every import and every export is recorded, identifying the user, the
+> action, the scope applied and — for imports — the assignment strategy
+> chosen. See Section 208.
 
-**Manager**
+**Pending client confirmation**
 
-> • import/export only if explicitly permitted
+Which roles may import data, and which roles may export data, is
+*pending client confirmation before security implementation and UAT*.
+Whether policy documents may be included in any export is also pending.
+See Section 212.
 
-**Staff**
-
-> • no import/export access by default
-
-Import/export controls should be hidden where the user does not have
-permission.
-
-**142. Import — Mobile Behaviour**
+These will be agreed with A&S Fincare during development and encoded as
+fixed application rules. They are not settings an Admin can configure.
+**167. Import — Mobile Behaviour**
 
 Large data imports are primarily a desktop/web administrative workflow.
 
-V1 does not need to reproduce the full spreadsheet mapping experience on
-mobile.
+V1 does not need to reproduce the full spreadsheet mapping and
+assignment experience on mobile.
 
 On mobile, authorized users may see:
 
@@ -6178,8 +8886,7 @@ Export may also remain web-first.
 
 This is consistent with the product principle that mobile focuses on
 operational CRM work rather than administration.
-
-**143. Import Flow Summary**
+**168. Import Flow Summary**
 
 **Upload CSV / Excel**
 
@@ -6193,7 +8900,23 @@ operational CRM work rather than administration.
 
 ↓
 
+**Choose Lead Assignment**
+
+**│**
+
+**├── Specific Team Lead**
+
+**├── Specific Salesperson**
+
+**└── Team → that team's round robin**
+
+**(active Team Lead + active Salespersons, batch size applies)**
+
+↓
+
 **Validate Rows**
+
+**(including assignment eligibility)**
 
 ↓
 
@@ -6203,9 +8926,13 @@ operational CRM work rather than administration.
 
 **Review Summary**
 
+**(shows the chosen assignment strategy)**
+
 ↓
 
 **Confirm Import**
+
+**(restates the assignment strategy)**
 
 ↓
 
@@ -6225,30 +8952,47 @@ operational CRM work rather than administration.
 
 ↓
 
-**Error Report**
+**Error Report + Assignment Summary**
 
-The important V1 rule is:
+The important V1 rules are:
 
-**Import should help customers bring existing data into the CRM safely
-without silently overwriting existing records or requiring developer
-assistance.**
+**Import must bring existing data into the CRM safely, without silently
+overwriting existing records and without bypassing duplicate checks,
+validation or hierarchy-safe assignment.**
 
-**144. Reports**
+**Every imported record must end up owned by a Team Lead or a
+Salesperson, or remain explicitly Unassigned. An import can never
+produce a record owned by an Admin or a Manager, and can never place a
+record in a team the importing user is not permitted to assign to.**
+**169. Reports**
 
-The Reports module provides Owner/Admin and authorized Managers with a
-simple view of CRM performance and pending business activity.
+The Reports module gives every role visibility of the work and results
+within their authorized scope, and gives supervisory roles roll-ups
+across the hierarchy below them.
 
-V1 reporting focuses on:
+V1 reporting covers:
 
-> • Leads
+> • Leads, including assignment, priority and conversion
 >
-> • Follow-ups
+> • Follow-ups and overdue activity
 >
 > • Renewals
 >
-> • Customers
+> • Customers and Customer Purchases
 >
-> • basic staff activity
+> • Closed Amount
+>
+> • incentive calculations and incentive status
+>
+> • team and individual performance
+>
+> • WhatsApp and Email activity, where already supported by those
+> modules
+>
+> • import results and failures
+
+Every figure in every report is calculated from the viewer's authorized
+scope under Section 2.3. See Section 170.
 
 V1 does not include:
 
@@ -6256,15 +9000,15 @@ V1 does not include:
 >
 > • advanced forecasting
 >
-> • financial/accounting reports
+> • financial, accounting or payroll reports
 >
 > • configurable dashboards
 >
 > • complex business intelligence
->
-> • cross-workspace reporting
 
-**145. Reports — Main Screen**
+Incentive reporting is operational reporting of the engine's results. It
+is not a payroll or accounting function. See Section 206.
+**170. Reports — Main Screen**
 
 Navigation:
 
@@ -6281,40 +9025,79 @@ The Reports screen should contain:
 > • This Month
 >
 > • Custom Date Range
+>
+> • reporting period, where the report uses one
 
-Where applicable:
+**Scope is derived, not chosen**
 
-**Record Owner / User Filter**
+Every report is calculated from the viewer's authorized scope under
+Section 2.3. Scope is applied before any figure is computed; it is not a
+filter the user selects and cannot be widened:
 
-Owner/Admin can view permitted workspace-wide data.
+> • **Admin** — organization-wide.
+>
+> • **Manager** — that Manager's own reporting hierarchy only: their
+> Team Leads, those teams, and the records belonging to them.
+>
+> • **Team Lead** — their own team, including their own operational
+> results.
+>
+> • **Salesperson** — their own assigned records and their own personal
+> results.
 
-Managers see data according to their permissions.
+A Manager must not see another Manager's branch, and a Team Lead must not
+see another Team Lead's team — not as a row, a total, a comparison, a
+benchmark, a ranking position, a percentage or a denominator. An
+organization-wide figure must not be shown to a Manager.
 
-Staff do not have access to management reports by default.
+Within their scope, a user may narrow the view by Manager, team, Team
+Lead or Salesperson. Narrowing is a filter over data already visible. It
+is never a permission change, and the options offered never include a
+branch or user the viewer cannot otherwise see. See Section 177.
 
-The detailed access rules will be defined under Settings → Roles &
-Permissions.
+**Levels of result**
 
-**146. Lead Report**
+Where relevant, reports distinguish:
 
-The Lead Report provides a summary of Lead activity and outcomes for the
-selected period.
+> • **personal performance** — the viewer's own owned or assigned
+> records
+>
+> • **direct-team performance** — a Team Lead's team, including that
+> Team Lead's own results shown separately
+>
+> • **Manager hierarchy roll-up** — all teams below a Manager
+>
+> • **organization-wide totals** — visible to Admin
+
+A roll-up is a supervisory figure. It does not make the supervisor the
+owner of the underlying records. See Section 2.5.
+
+Reports are enforced server-side. Hiding a report, a row or a column is
+presentation only.
+
+Which roles may access which reports, and which may export report data,
+is *pending client confirmation* where not already fixed by the scope
+rules above. See Section 212.
+**171. Lead Report**
+
+The Lead Report summarises Lead activity and outcomes for the selected
+period, within the viewer's authorized scope.
 
 Show:
 
 > • Leads Created
 >
+> • Leads Assigned
+>
 > • Leads Won
 >
 > • Leads Lost
 >
+> • Leads Converted to Customers
+>
 > • Open Leads
 
-Breakdowns:
-
 **Leads by Stage**
-
-Example:
 
 **Stage**
 
@@ -6332,13 +9115,35 @@ Interested
 
 17
 
-Proposal Sent
+Won
 
 9
 
-**Leads by Source**
+**Leads by Priority**
 
-Where Lead Source is available:
+**Priority**
+
+**Leads**
+
+Hot
+
+18
+
+Warm
+
+44
+
+Cold
+
+34
+
+Lead Priority is a separate dimension from Lead Stage. A Lead appears
+once in each breakdown, and the two breakdowns must not be combined into
+a single axis. Priority values are those configured in Section 192;
+a deactivated value still appears in historical breakdowns for periods in
+which it was in use.
+
+**Leads by Source**
 
 **Source**
 
@@ -6360,6 +9165,36 @@ Other
 
 8
 
+**Leads by Team**
+
+**Team**
+
+**Team Lead**
+
+**Leads**
+
+**Converted**
+
+Kochi Health Team
+
+Arun
+
+38
+
+12
+
+Ernakulam Motor Team
+
+Meera
+
+31
+
+10
+
+The team breakdown is available to Admin and to Managers within their
+branch. A Team Lead sees their own team; a Salesperson sees only their
+own Leads and no team breakdown.
+
 **Lead Outcomes**
 
 Show:
@@ -6368,15 +9203,28 @@ Show:
 >
 > • Lost
 >
+> • Converted
+>
 > • Still Open
 
-Selecting a stage, source or outcome should open the Leads list with the
-corresponding filter applied where practical.
+**Assignment reporting**
 
-**147. Follow-up Report**
+The report also covers how Leads reached their owners:
 
-The Follow-up Report helps management understand whether customer and
-Lead follow-ups are being completed on time.
+> • Leads assigned by team round robin
+>
+> • Leads assigned or reassigned manually
+>
+> • Leads currently Unassigned, with the destination team where one was
+> selected
+
+Selecting a stage, priority, source, outcome or team should open the
+Leads list with the corresponding filter applied, within the same scope.
+**172. Follow-up Report**
+
+The Follow-up Report helps supervisory users understand whether Lead and
+Customer follow-ups are being completed on time, and helps operational
+users see their own outstanding work.
 
 Show:
 
@@ -6388,7 +9236,9 @@ Show:
 >
 > • Overdue
 
-Breakdown by user:
+Breakdown by user, within the viewer's authorized scope:
+
+**Team**
 
 **User**
 
@@ -6398,6 +9248,8 @@ Breakdown by user:
 
 **Overdue**
 
+Kochi Health Team
+
 Arun
 
 32
@@ -6406,6 +9258,8 @@ Arun
 
 2
 
+Kochi Health Team
+
 Sneha
 
 27
@@ -6414,67 +9268,101 @@ Sneha
 
 4
 
-The report should include both Lead and Customer Follow-ups.
+The breakdown level follows the viewer's role: a Salesperson sees only
+their own row, a Team Lead their team, a Manager their teams, and Admin
+the organization.
+
+The report includes both Lead and Customer follow-ups.
+
+Follow-ups are counted by **Assigned To**, not by Record Owner. A
+follow-up assigned to one user on a record owned by another is counted
+against the assignee.
 
 Where useful, selecting a count should open the corresponding filtered
-Follow-ups list.
+Follow-ups list, within the same scope.
+**173. Renewal Report**
 
-**148. Renewal Report**
+The Renewal Report provides visibility of recurring and renewal business
+within the viewer's authorized scope.
 
-The Renewal Report provides visibility into recurring and renewal
-business.
+Show, matching the renewal statuses defined in Section 72:
 
-Show:
-
-> • Renewals Due
+> • Upcoming
 >
-> • Renewed / Completed
+> • Due Today
 >
 > • Overdue
 >
+> • Renewed / Completed
+>
 > • Not Renewing
 
-The selected date range applies primarily to the relevant **Due/Renewal
-Date**.
+The selected date range applies primarily to the Customer Purchase's
+**Renewal Date**.
 
-Breakdown by Product/Service:
+Breakdown by catalogue:
 
-**Product / Service**
+**Product Category**
 
-**Due**
+**Provider**
 
-**Renewed / Completed**
+**Plan / Sub-product**
+
+**Upcoming**
+
+**Due Today**
 
 **Overdue**
+
+**Renewed / Completed**
 
 **Not Renewing**
 
 Health Insurance
 
+Star Health
+
+Family Health Optima
+
 28
 
-20
+1
 
 5
+
+20
 
 3
 
 Motor Insurance
 
+Acme General
+
+Two-Wheeler Package
+
 17
 
-13
+0
 
 3
 
+13
+
 1
+
+Breakdown by team, Team Lead or Assigned To is also available, bounded by
+the viewer's scope.
 
 Where useful, selecting a count should open the Renewals list with the
 corresponding filter applied.
 
-**149. Customer Report**
+Renewal reminder outcomes may also be reported, including reminders sent,
+failed and skipped, as defined in Sections 108 and 134. A failed or
+skipped reminder must never be counted as sent.
+**174. Customer and Customer Purchase Report**
 
-The Customer Report provides a simple overview of the customer base.
+This report provides an overview of the customer base and what has been
+sold, within the viewer's authorized scope.
 
 Show:
 
@@ -6482,31 +9370,109 @@ Show:
 >
 > • New Customers
 >
-> • Customers with Upcoming Due Dates
+> • Customers with Upcoming Renewals
 >
 > • Customers with Overdue Items
+>
+> • Total Customer Purchases
+>
+> • Purchases `Closed/Active`
+>
+> • Purchases awaiting required policy documents
+>
+> • Customers holding more than one Customer Purchase
 
-**Total Customers** represents the current active Customer count.
+**Total Customers** represents the current active Customer count within
+scope.
 
-**New Customers** represents Customers created during the selected date
-range.
+**New Customers** represents Customers created during the selected
+period.
 
-Upcoming and overdue counts are based on active Customer Product/Service
-records and their Due/Renewal/Expiry Dates.
+Upcoming and overdue counts are based on active Customer Purchases and
+their Renewal Dates.
 
-This report is intended as a high-level customer overview rather than
-detailed customer analytics.
+**Breakdown by catalogue**
 
-**150. Staff Activity Report**
+**Product Category**
 
-Authorized management users should be able to review basic CRM activity
-by staff members.
+**Provider**
 
-Example:
+**Plan / Sub-product**
 
-**User**
+**Purchases**
+
+**Closed/Active**
+
+**Awaiting Documents**
+
+Health Insurance
+
+Star Health
+
+Family Health Optima
+
+28
+
+24
+
+4
+
+Motor Insurance
+
+Acme General
+
+Two-Wheeler Package
+
+17
+
+15
+
+2
+
+**Purchases awaiting required policy documents** is an operational
+figure, not a sales figure. It identifies work outstanding before those
+purchases can become `Closed/Active` and before their Closed Amount
+becomes eligible.
+
+A Customer with several purchases is counted once as a Customer and once
+per purchase in the purchase figures. The two must not be added together.
+
+This report is a high-level overview rather than detailed analytics.
+**175. Team and Individual Performance Report**
+
+This report gives supervisory users operational visibility of activity
+and results below them, and gives operational users visibility of their
+own work.
+
+**Scope and structure**
+
+The report presents figures at the levels the viewer is authorized to
+see:
+
+> • **Salesperson** — own activity and own results only.
+>
+> • **Team Lead** — own personal results, and a breakdown for each
+> Salesperson in their team, plus the team total. Own results and team
+> total are shown as distinct figures.
+>
+> • **Manager** — a breakdown by team within their reporting hierarchy,
+> and the branch total.
+>
+> • **Admin** — a breakdown by Manager, and the organization total.
+
+Example, as seen by a Manager:
+
+**Team**
+
+**Team Lead**
 
 **Leads Owned**
+
+**Converted**
+
+**Purchases Closed/Active**
+
+**Eligible Closed Amount**
 
 **Follow-ups Completed**
 
@@ -6514,9 +9480,17 @@ Example:
 
 **Renewals Completed**
 
+Kochi Health Team
+
 Arun
 
 38
+
+12
+
+9
+
+—
 
 32
 
@@ -6524,9 +9498,17 @@ Arun
 
 14
 
-Sneha
+Ernakulam Motor Team
+
+Meera
 
 31
+
+10
+
+7
+
+—
 
 27
 
@@ -6534,41 +9516,193 @@ Sneha
 
 11
 
-The purpose is operational visibility, not employee productivity
-scoring.
-
 Definitions:
 
 > **• Leads Owned** = active Leads where the user is the current Record
 > Owner
 >
+> **• Converted** = Leads converted to Customers during the period
+>
+> **• Purchases Closed/Active** = Customer Purchases that reached
+> `Closed/Active` during the period
+>
+> **• Eligible Closed Amount** = as defined in Section 176
+>
 > **• Follow-ups Completed** = Follow-ups assigned to and completed by
-> the user during the selected period
+> the user during the period
 >
 > **• Follow-ups Overdue** = incomplete Follow-ups currently overdue and
 > assigned to the user
 >
 > **• Renewals Completed** = Renewal actions completed by the user
-> during the selected period
+> during the period
 
-This distinction is important because **Record Owner** and **Assigned
-To** are different concepts.
+**Record Owner and Assigned To are different concepts**
 
-**151. Report Filters**
+Leads Owned counts ownership. Follow-ups and Renewals count assignment.
+A user may be assigned work on a record they do not own, and this report
+must not conflate the two.
+
+**Personal production versus roll-up**
+
+A Team Lead may personally own Leads and Customer Purchases and close
+sales, so a Team Lead has both personal results and a team roll-up.
+These must always be separately identifiable, and the team total must
+not be presented as the Team Lead's own production.
+
+Managers and Admins have no personal production. Their figures are
+supervisory roll-ups only. This report must never present a Manager or
+Admin as the owner of an underlying record. See Section 2.5.
+
+**Peer isolation**
+
+A Manager sees only their own branch, and a Team Lead only their own
+team. No comparison, ranking, benchmark, percentage or denominator may
+reveal a peer branch or a peer team, or the organization total, to a user
+not authorized to see it.
+
+**Purpose**
+
+The report provides operational visibility and supports the performance
+and incentive measurement defined in Sections 176 and 206.
+
+**176. Closed Amount and Incentive Report**
+
+This report covers recorded transaction value and the results of the
+incentive engine defined in Section 206.
+
+**Eligible Closed Amount**
+
+A Customer Purchase contributes to **eligible Closed Amount** only when
+both conditions hold:
+
+> 1. its required policy documents are complete; and
+>
+> 2. it is marked `Closed/Active`.
+
+Where a report shows both, it must clearly distinguish:
+
+> • **Recorded Closed Amount** — the amount entered on purchases,
+> including those not yet `Closed/Active`
+>
+> • **Eligible Closed Amount** — the amount that counts toward
+> performance and incentive totals
+
+A figure labelled only "Closed Amount" is ambiguous and must not be used
+where both concepts appear.
+
+**Aggregation levels**
+
+> • Salesperson
+>
+> • Team Lead personal
+>
+> • Team total
+>
+> • Manager branch total
+>
+> • Organization total
+
+**No double counting**
+
+Each Customer Purchase contributes its eligible Closed Amount exactly
+once at each level of a roll-up. A purchase owned by a Salesperson is
+counted once in that Salesperson's figure, once in their team's total,
+once in the Manager's branch total, and once in the organization total —
+never twice at the same level. A Team Lead's personal purchases are
+included in the team total once, in addition to being shown separately as
+their personal production; the team total is not the sum of the team
+figure and the Team Lead figure.
+
+Where a purchase has renewal cycles, each cycle's eligible Closed Amount
+is attributed to the period in which that cycle became `Closed/Active`.
+A renewal does not re-count the original cycle.
+
+**Incentive reporting**
+
+The report presents calculated incentive results and the information
+needed to understand them:
+
+> • the reporting period
+>
+> • the participant
+>
+> • the eligible Closed Amount used
+>
+> • the Customer Purchases counted
+>
+> • the slab and rule applied
+>
+> • the rule version in force when the calculation ran
+>
+> • the calculation date
+>
+> • the current status of the result
+
+Statements may be produced at Salesperson, Team Lead, Manager and
+organization level, for whichever levels are confirmed as incentive
+participants.
+
+**Traceability**
+
+A historical incentive result must remain traceable to the rule version
+used to produce it. A later change to slabs or rules must not silently
+restate a past result. Where a result is recalculated, adjusted or
+reversed, the previous result and the reason remain visible, and the
+change is auditable under Section 208.
+
+**Visibility**
+
+Incentive figures follow Section 2.3. A Salesperson sees their own
+result; a Team Lead their own and their team's; a Manager their branch;
+Admin the organization. No ranking, benchmark or percentage may reveal a
+peer's figures to a user not authorized to see them.
+
+**Pending client confirmation**
+
+The engine's capability is committed. Its business values are not. Slab
+thresholds, rates, formulas, eligibility conditions, eligibility dates,
+reporting periods, which roles participate, how Team Lead incentives
+treat personal versus team production, adjustments, reversals, approval
+and payout rules are all *pending client confirmation*. See
+Section 212.
+
+Supervising a team does not by itself establish that a Manager is an
+incentive participant. Participant eligibility must be confirmed.
+
+No slab, rate, percentage or formula appears in this specification, and
+none may be assumed.
+**177. Report Filters**
 
 Reports should support only the filters relevant to that report.
 
-Common filters may include:
+Available filters may include:
 
-> • Date Range
+> • Date Range / reporting period
 >
-> • Record Owner / User
+> • Manager
 >
-> • Product/Service
+> • Team
+>
+> • Team Lead
+>
+> • Salesperson
 >
 > • Lead Stage
 >
+> • Lead Priority
+>
 > • Lead Source
+>
+> • Product Category
+>
+> • Provider
+>
+> • Plan / Sub-product
+>
+> • Customer Purchase status
+>
+> • Renewal status
 
 Do not show every filter on every report.
 
@@ -6576,22 +9710,49 @@ For example:
 
 **Renewal Report**
 
-> Date Range  
-> Product/Service  
-> Assigned To
+> • Date Range
+>
+> • Product Category / Provider / Plan
+>
+> • Renewal status
+>
+> • Team / Assigned To
 
 **Lead Report**
 
-> Date Range  
-> Record Owner  
-> Stage  
-> Source
+> • Date Range
+>
+> • Lead Stage
+>
+> • Lead Priority
+>
+> • Lead Source
+>
+> • Team / Record Owner
+
+**Scope-bounded filter options**
+
+Hierarchy filters narrow within the viewer's authorized scope; they never
+widen it. The options offered are limited to what the viewer can already
+see:
+
+> • Admin may filter by any Manager, team, Team Lead or Salesperson
+>
+> • a Manager may filter only within their own reporting hierarchy
+>
+> • a Team Lead may filter only within their own team
+>
+> • a Salesperson has no hierarchy filters, because their scope is a
+> single user
+
+A filter option list must never disclose a Manager, team or user the
+viewer cannot otherwise see.
 
 Changing filters refreshes the report.
 
-A **Clear Filters** action restores the default report view.
-
-**152. Report Drill-down**
+A **Clear Filters** action restores the default report view, which is the
+viewer's full authorized scope — not an organization-wide view.
+**178. Report Drill-down**
 
 Where a report metric corresponds directly to CRM records, selecting the
 metric should open the appropriate filtered list.
@@ -6615,7 +9776,11 @@ opens the Leads list filtered to:
 This allows reports to act as an entry point into actual CRM work rather
 than displaying numbers with no action behind them.
 
-**153. Report Export**
+Drill-down applies the same scope as the metric it came from. A user must
+never reach a record through a report that they could not reach through
+the corresponding list screen. A roll-up figure drilled into by a Manager
+opens the underlying records within that Manager's branch only.
+**179. Report Export**
 
 Authorized users may export report data.
 
@@ -6633,12 +9798,26 @@ The export must respect:
 >
 > • selected date range
 >
-> • user permissions
+> • the requesting user's authorized scope under Section 2.3
+
+An exported file must contain exactly the rows the user could see on
+screen. It must never include a peer Manager's branch, a peer Team
+Lead's team, or any record outside the viewer's scope. Scope is applied
+server-side when the file is generated, not by filtering a wider result
+afterwards.
 
 The exported data should contain the underlying report data relevant to
 the selected report rather than a screenshot of the report UI.
 
-**154. Empty, Loading and Error States**
+Report exports do not include policy documents or their contents. See
+Section 165.
+
+Every report export is recorded, identifying the requesting user, the
+report, the filters and the scope applied.
+
+Which roles may export report data is *pending client confirmation*. See
+Section 212.
+**180. Empty, Loading and Error States**
 
 **Empty State**
 
@@ -6646,6 +9825,11 @@ If no data exists for the selected filters:
 
 > **No report data available  
 > ** There is no data matching the selected period and filters.
+
+An empty report means there is nothing **within the viewer's authorized
+scope** matching the filters. It must never imply that the organization
+as a whole has no data, and must never disclose that data exists
+elsewhere.
 
 **Loading State**
 
@@ -6659,11 +9843,11 @@ Use loading placeholders while report data is being retrieved.
 **\[ Retry \]**
 
 Existing filters should remain selected after a temporary loading error.
+A failed load must not fall back to a wider scope.
+**181. Reports — Mobile Behaviour**
 
-**155. Reports — Mobile Behaviour**
-
-Reports are primarily a web/management feature, but authorized users may
-access a simplified report view on mobile.
+Reports are primarily a web feature, but authorized users may access a
+simplified report view on mobile.
 
 On mobile:
 
@@ -6675,10 +9859,17 @@ On mobile:
 >
 > • detailed analysis and report export remain web-first
 
-Mobile reporting should prioritize quick management visibility rather
-than reproducing the full desktop reporting layout.
+Mobile applies exactly the same scope as desktop. A narrower screen
+never widens what a user can see, and a condensed figure is still
+calculated from the viewer's authorized scope only.
 
-**156. Reports Flow Summary**
+A Salesperson's mobile reports show their own work and their own
+performance. A Team Lead's show their own results and their team's, kept
+visually distinct as described in Section 175.
+
+Mobile reporting should prioritize quick visibility rather than
+reproducing the full desktop reporting layout.
+**182. Reports Flow Summary**
 
 **Reports**
 
@@ -6694,9 +9885,19 @@ than reproducing the full desktop reporting layout.
 
 **├── Renewals**
 
-**├── Customers**
+**├── Customers and Customer Purchases**
 
-**└── Staff Activity**
+**├── Team and Individual Performance**
+
+**├── Closed Amount and Incentives**
+
+**└── Import Results**
+
+↓
+
+**Scope applied automatically from the viewer's role**
+
+**(Admin · Manager branch · Team · Own records)**
 
 ↓
 
@@ -6714,10 +9915,13 @@ than reproducing the full desktop reporting layout.
 
 **Open Relevant Filtered CRM Records**
 
-**157. Settings & Administration**
+Scope is never a filter the user chooses. It is derived from the
+viewer's position in the hierarchy and applied before any figure is
+calculated.
+**183. Settings & Administration**
 
-Settings & Administration allows authorized users to configure the CRM
-for their workspace.
+Settings & Administration allows Admin to configure A&S Fincare business
+data.
 
 Navigation:
 
@@ -6725,47 +9929,74 @@ Sidebar → Settings
 
 Settings should include:
 
-> • Business Settings
+> • Organization Settings
 >
 > • Users
 >
-> • Roles & Permissions
+> • Teams
+>
+> • Roles & Permissions — reference only; role capabilities are fixed
 >
 > • Lead Assignment
 >
-> • Lead Source
+> • Lead Priority
+>
+> • Lead Sources
 >
 > • Pipeline
 >
-> • Products & Services
+> • Product Catalogue
 >
 > • Custom Fields
 >
 > • Reminder Settings
 >
+> • Incentive Rules
+>
 > • WhatsApp Settings
+>
+> • WhatsApp Templates
 >
 > • Email Settings
 >
 > • Email Templates
 >
-> • Modules & Features
->
 > • Data Import / Export
+
+**What Settings does and does not control**
+
+Settings configures **business data**. It does not configure application
+scope or access control.
+
+> • There is no Modules & Features screen. Core functionality cannot be
+> enabled or disabled by an administrator. See Section 200.
+>
+> • **Roles & Permissions** is a reference screen describing the fixed
+> role model. It is not an editor. There is no custom-role builder, no
+> editable role definition, no administrator-facing permission matrix
+> and no per-user override. See Sections 187 and 188.
+>
+> • No setting can grant a user visibility that bypasses the reporting
+> hierarchy in Section 2.3.
+
+Settings visibility follows the fixed role model. Settings is available
+to Admin; a small number of subsections are available to other roles only
+where this specification states so explicitly. Hiding a settings screen
+is presentation only — the server must enforce access.
 
 Settings are primarily a web/desktop administrative experience.
 
-**158. Business Settings**
+Significant configuration changes are auditable. See Section 208.
+
+**184. Organization Settings**
 
 Navigation:
 
-Settings → Business Settings
+Settings → Organization Settings
 
-Owner/Admin can manage:
+Admin can manage the operating details of the A&S Fincare organization:
 
-> • Business Name
->
-> • Business Type / Industry
+> • Organization Name — A&S Fincare
 >
 > • Business Phone
 >
@@ -6779,18 +10010,23 @@ Owner/Admin can manage:
 >
 > • Currency
 
-The workspace Time Zone is used for scheduled activities such as
-Follow-ups and automated reminders.
+These are operating details only. There is no business-type or industry
+selection, and these settings do not change the application's identity,
+its feature set or any role's scope.
 
-Changing the workspace Time Zone does not change date-only values such
-as Renewal or Expiry Dates and does not silently reschedule existing
-scheduled actions.
+The organization Time Zone is used for scheduled activities such as
+Follow-ups and automated renewal reminders.
+
+Changing the Time Zone does not change date-only values such as Renewal
+Dates, and does not silently reschedule existing scheduled actions.
 
 Action:
 
 **Save Changes**
 
-**159. Users**
+Changes here are significant configuration changes and are auditable. See
+Section 208.
+**185. Users**
 
 Navigation:
 
@@ -6804,17 +10040,23 @@ Show:
 >
 > • Role
 >
+> • Team
+>
+> • Reports To
+>
 > • Status
 >
 > • Actions
 
 Roles:
 
-> • Owner/Admin
+> • Admin
 >
 > • Manager
 >
-> • Staff/Sales
+> • Team Lead
+>
+> • Salesperson
 
 Statuses:
 
@@ -6830,16 +10072,135 @@ Actions:
 >
 > • Change Role
 >
+> • Change Team
+>
+> • Change Reporting Manager
+>
 > • Deactivate
 >
 > • Reactivate
 
-Users with CRM history should be deactivated rather than permanently
+**Required hierarchy linkage**
+
+When a user is created or edited, the application must enforce the
+cardinality rules defined in Section 2.2:
+
+**Role**
+
+**Reports To**
+
+**Team**
+
+Admin
+
+Not applicable
+
+Not applicable
+
+Manager
+
+Admin level
+
+Not applicable; a Manager supervises teams through their Team Leads
+
+Team Lead
+
+Exactly one Manager — required
+
+Exactly one team, which that Team Lead leads — required
+
+Salesperson
+
+The Team Lead of their team
+
+Exactly one team — required
+
+The application must reject a save that would:
+
+> • leave a Team Lead without a Manager
+>
+> • leave a Team Lead without a team
+>
+> • give a team more than one active Team Lead
+>
+> • leave a Salesperson without a team
+>
+> • place a Salesperson in more than one team
+>
+> • assign a team or reporting relationship the acting Admin is not
+> permitted to maintain
+
+Admin assigns one of the four predefined roles and maintains reporting
+relationships and team membership. Admin cannot create a new role or
+change what a role is permitted to do. See Section 187.
+
+Users with CRM history must be deactivated rather than permanently
 deleted.
 
-At least one active Owner/Admin must remain in the workspace.
+At least one active Admin must remain.
 
-**160. User Deactivation**
+Changes to a user's role, team or reporting Manager are auditable
+actions. Detailed audit-history requirements are defined in Section 208.
+
+## 185.1 Teams
+
+Navigation:
+
+Settings → Teams
+
+A team is a first-class record consisting of exactly one active Team
+Lead and the Salespersons assigned to that Team Lead, as defined in
+Section 2.2.
+
+Show:
+
+> • Team Name
+>
+> • Team Lead
+>
+> • Reporting Manager
+>
+> • Number of active Salespersons
+>
+> • Status
+
+Actions:
+
+> • Add Team
+>
+> • Rename Team
+>
+> • Change Team Lead
+>
+> • Move Team to another Manager
+>
+> • Deactivate Team
+>
+> • Reactivate Team
+
+**Rules**
+
+> • A team must have exactly one active Team Lead at all times.
+>
+> • A Team Lead leads exactly one team.
+>
+> • A team reports to exactly one Manager, through its Team Lead.
+>
+> • Moving a team to another Manager changes the reporting Manager of
+> that team's Team Lead and therefore changes which Manager can see the
+> team's records.
+>
+> • Changing the Team Lead, moving a team between Managers and
+> deactivating a team are auditable actions.
+>
+> • A team cannot be deactivated while it has active Salespersons or
+> active operational records. These must be moved or reassigned first.
+
+Changing a team's Team Lead or reporting Manager changes future
+visibility. It must not rewrite historical activity, and it must not
+remove a past user's name from records they previously worked.
+
+**186. User Deactivation**
 
 Before deactivating a user, check whether they currently own or are
 assigned active work.
@@ -6850,6 +10211,8 @@ This includes:
 >
 > • Customers
 >
+> • Customer Purchases
+>
 > • incomplete Follow-ups
 >
 > • Renewal actions
@@ -6857,257 +10220,374 @@ This includes:
 > • open WhatsApp conversations
 
 If active responsibilities exist, they must be reassigned to an active
-user before deactivation is completed. Users deactivated while
-participating in Round Robin are automatically removed from future Lead
-assignment. The last active Owner/Admin cannot be deactivated.
+Team Lead or Salesperson before deactivation is completed. Reassignment
+targets are limited to users the acting supervisor is permitted to
+assign to under Section 2.3.
+
+**Effect on future assignment**
+
+Deactivating a Team Lead or Salesperson removes that user from future
+Lead assignment, including their team's automatic assignment pool. Team
+assignment behaviour is defined in Section 189.
+
+Admins and Managers are never part of an assignment pool, so deactivating
+them has no effect on assignment.
+
+**Protecting the hierarchy**
+
+Deactivation and hierarchy changes must not silently leave the structure
+invalid. The application must block the change and explain what is
+required when an action would:
+
+> • leave a team without an active Team Lead
+>
+> • leave a Team Lead without an active Manager
+>
+> • leave a Salesperson without an active team
+>
+> • remove the last active Admin
+
+To deactivate a Team Lead, an authorized Admin must first assign a
+replacement Team Lead to that team, or move the team's Salespersons and
+records to another team.
 
 Historical activity should continue to show the original user's name.
 
 Reactivating the user does not automatically restore previously
-reassigned work.
+reassigned work, and does not automatically restore their previous role,
+team or reporting relationship. These must be set explicitly.
 
-**161. Roles & Permissions**
+**187. Roles & Permissions**
 
 Navigation:
 
 Settings → Roles & Permissions
 
-V1 uses three predefined roles:
+V1 uses four predefined roles, defined in full in Section 2:
 
-**Owner/Admin**
+**Admin**
 
-Full workspace and administration access.
-
-**Manager**
-
-Operational management access to permitted records and reports.
-
-**Staff/Sales**
-
-Operational access primarily to owned or assigned records.
-
-V1 does not include custom role creation or field-level permission
-configuration.
-
-**162. Permission Matrix**
-
-**Permission**
-
-**Owner/Admin**
+Supervisory. Organization-wide visibility. Maintains roles, the
+reporting hierarchy, teams and approved business configuration. Does not
+own operational records.
 
 **Manager**
 
-**Staff/Sales**
+Supervisory. Visibility restricted to their own reporting hierarchy.
+Supervises their Team Leads and teams. Does not own operational records.
 
-View all Leads/Customers
+**Team Lead**
 
-Yes
+Supervisory within their own team and operational. Leads exactly one
+team, reports to exactly one Manager, and may own and work operational
+records.
 
-Configurable
+**Salesperson**
 
-No
+Operational. Belongs to exactly one team and may own and work the
+records assigned to them.
 
-Add Leads/Customers
+**Roles are fixed by the application**
 
-Yes
+Role capabilities are defined by the application and are not
+configurable inside the CRM.
 
-Yes
+The CRM does not provide:
 
-Configurable
-
-Edit permitted records
-
-Yes
-
-Yes
-
-Yes
-
-Change Record Owner
-
-Yes
-
-Configurable
-
-No
-
-Reassign Follow-ups / Renewals
-
-Yes
-
-Configurable
-
-No
-
-Send individual WhatsApp messages
-
-Yes
-
-Yes
-
-Yes
-
-Assign WhatsApp conversations
-
-Yes
-
-Configurable
-
-No
-
-Send bulk WhatsApp messages
-
-Yes
-
-Configurable
-
-No
-
-Import / Export
-
-Yes
-
-Configurable
-
-No
-
-View Reports
-
-Yes
-
-Yes
-
-No
-
-Manage Users
-
-Yes
-
-No
-
-No
-
-Configure CRM Settings
-
-Yes
-
-No
-
-No
-
-Send individual Emails
-
-Yes
-
-Yes
-
-Yes
-
-Send manual Email reminders
-
-Yes 
-
-Yes
-
-Configurable
-
-Send controlled bulk Email reminders
-
-Yes
-
-Configurable
-
-No
-
-Manage Email templates
-
-Yes 
-
-No 
-
-No
-
-Configure Email sender
-
-Yes
-
-No
-
-No
-
-Manager record visibility can be configured as:
-
-> **• All Records**
+> • custom role creation
 >
-> **• Own Records**
+> • a permission builder
+>
+> • capability toggles for a role
+>
+> • an editable permission matrix
+>
+> • a configurable "All Records / Own Records" security scope
+>
+> • per-user permission overrides that bypass the reporting hierarchy
 
-V1 does not include a separate Teams/Departments structure.
+Admin may:
 
-**163. Lead Assignment**
+> • assign one of the four predefined roles to a user
+>
+> • maintain reporting relationships
+>
+> • maintain team membership
+
+Admin may not redefine what a role is permitted to do.
+
+Changing what a role can do is an application change. It requires a
+reviewed change/change-control process and a new release. It is not a
+setting.
+
+**Configurable business data is not a configurable permission**
+
+Some business data is deliberately configurable by Admin — for example
+Lead Priority values, and other business configuration defined elsewhere
+in this specification. Configuring business data does not change any
+role's security scope, and must never be presented as a permission
+setting.
+
+**188. Role and Scope Summary**
+
+This section summarises the confirmed role behaviour. It is a summary of
+Section 2 and must not contradict it.
+
+**Confirmed scope by role**
+
+| Area | Admin | Manager | Team Lead | Salesperson |
+|---|---|---|---|---|
+| Record visibility | Organization-wide | Own reporting hierarchy only | Own team only | Own assigned records only |
+| Peer visibility | Not applicable | Cannot see another Manager's branch | Cannot see another Team Lead's team | None |
+| May be Record Owner | No | No | Yes | Yes |
+| May be operational Assigned To | No | No | Yes | Yes |
+| Dashboards and reports | Organization-wide roll-up | Roll-up for own branch | Own team, including own work | Own work only |
+| Assign and reassign operational records | Within the organization | Within own reporting hierarchy | Within own team | No |
+| Participates in automatic Lead assignment | No | No | Yes, within own team | Yes, within own team |
+| Assign roles, hierarchy and teams | Yes | No | No | No |
+| Configure approved business data | Yes | No | No | No |
+| Create custom roles or edit role capabilities | No | No | No | No |
+| WhatsApp: see unassigned conversations | Yes | Yes | No | No |
+| WhatsApp: reply within permitted scope | Assigned conversations organization-wide, without becoming owner. **No reply while unassigned** | Assigned conversations within own reporting hierarchy, without becoming owner. **No reply while unassigned** | Their own and their team's assigned conversations | Conversations assigned to them |
+| WhatsApp: reassign conversations | Organization-wide | Within own reporting hierarchy | Within own team | No |
+
+Manager visibility is fixed to the Manager's own reporting hierarchy. It
+is not configurable.
+
+Teams are part of the application, as defined in Sections 2.2 and 185.1.
+
+**Pending action-level decisions**
+
+V1 uses a **fixed, development-defined permission model.** The detailed
+action-by-action permission matrix has not been finalized. It will be
+agreed with A&S Fincare during development, approved before security
+implementation and UAT, and then encoded as fixed application rules.
+
+It is not, and will never become, an administrator-facing screen. The
+CRM provides no custom-role builder, no editable role definition, no
+permission matrix editor and no per-user override.
+
+The following action-level decisions are outstanding. They are recorded
+here so they are visible to implementers. They are not settings that an
+Admin can configure in the CRM, and no answer should be assumed until it
+is confirmed.
+
+> • Whether Admin and Manager may create a Lead or Customer directly,
+> and if so, which Team Lead or Salesperson the new record must be
+> assigned to at creation. *Pending client confirmation before security
+> implementation and UAT.*
+>
+> • Which roles may import data, and which roles may export data.
+> *Pending client confirmation before security implementation and UAT.*
+>
+> • Which roles may send controlled bulk WhatsApp and bulk Email
+> messages. *Pending client confirmation before security implementation
+> and UAT.*
+>
+> • Which roles may archive and restore Leads, Customers and related
+> operational records. *Pending client confirmation before security
+> implementation and UAT.*
+>
+> • Which roles may upload, replace or remove policy documents. *Pending
+> client confirmation before security implementation and UAT.*
+>
+> • Which roles may export report data. *Pending client confirmation
+> before security implementation and UAT.*
+>
+> • Which supervisory role is responsible for unassigned WhatsApp
+> conversations, and within what response expectation. *Pending client
+> confirmation before security implementation and UAT.*
+>
+> • How temporary leave, pauses and availability affect a user's
+> participation in their team's automatic Lead assignment. *Pending
+> client confirmation before security implementation and UAT.*
+
+Once confirmed, each decision is implemented as fixed application
+behaviour for the relevant role. Later changes require a reviewed
+application change/change-control process.
+
+These items are also listed in the consolidated register in
+Section 212, together with every other decision still pending.
+
+
+**189. Lead Assignment**
 
 Navigation:
 
 Settings → Lead Assignment
 
-Controls how new Leads receive a Record Owner.
+Controls how a new Lead receives a Record Owner.
 
-Supported V1 modes:
+A Lead's Record Owner is always a **Team Lead or Salesperson**. Admins
+and Managers can never be a Lead's Record Owner, whether by manual
+selection, automatic assignment, import or reassignment. See Section 2.5.
+
+**Supported V1 modes**
 
 **Manual**
 
-Authorized user selects the Record Owner.
+An authorized user selects the Record Owner.
 
-**Round Robin**
+The selectable users are limited to the Team Leads and Salespersons the
+acting user is permitted to assign to:
 
-New Leads are assigned to selected active users in a repeating sequence.
-
-Owner/Admin can configure a **Batch Size**, which defines how many
-consecutive Leads are assigned to one user before the system moves to
-the next user.
-
-Example with **Batch Size = 10**:
-
-Leads 1–10 → Arun
-
-Leads 11–20 → Sneha
-
-Leads 21–30 → Joseph
-
-Leads 31–40 → Arun
-
-If **Batch Size = 1**, Leads are assigned one at a time:
-
-Lead 1 → Arun
-
-Lead 2 → Sneha
-
-Lead 3 → Joseph
-
-Lead 4 → Arun
-
-Configuration:
-
-> • Eligible Users
+> • a Team Lead may assign within their own team
 >
-> • Batch Size
+> • a Manager may assign within their own reporting hierarchy
+>
+> • an Admin may assign anywhere in the organization
 
-Only active eligible users participate in the rotation.
+A supervisor who performs an assignment does not become the owner.
 
-Changes to eligible users or Batch Size apply only to future Lead
-assignments and do not alter existing Lead ownership. Inactive or
-ineligible users do not participate in future assignments.
+**Automatic — team round robin**
 
-If no eligible active user is available, the Lead remains
-**Unassigned**.
+Automatic assignment is always scoped to one team. It never selects a
+user outside the destination team.
 
-Unassigned Leads are visible to Owner/Admin and Managers with
-appropriate visibility.
+## 189.1 Team Round Robin
 
-**164. Lead Sources**
+**Team selection comes first**
 
-Owner/Admin can manage the Lead Source options used by the workspace.
+Automatic assignment begins only after a destination team has been
+selected. There is no organization-wide rotation and no rotation that
+spans teams.
 
-Default options:
+A destination team may be selected through:
+
+> • authorized manual Lead creation
+>
+> • bulk import
+>
+> • an authorized reassignment flow
+>
+> • another approved Lead-ingestion flow
+
+The WhatsApp unknown-contact flow is **not** one of these. A Lead created
+from an unknown WhatsApp conversation is assigned **directly** to the
+active Team Lead selected by the acting Admin or Manager, and does not
+enter the team's round-robin pool. See Section 101.
+
+**Eligible pool**
+
+For the selected team, the eligible automatic recipients are:
+
+> • the team's active Team Lead
+>
+> • the team's active Salespersons
+
+The active Team Lead participates in the rotation on the same basis as
+the active Salespersons, because a Team Lead may personally work Leads
+and close sales.
+
+The following are never eligible recipients:
+
+> • Admin
+>
+> • Manager
+>
+> • inactive users
+>
+> • any user belonging to another team
+
+Handling of temporary leave, pauses and availability is *pending client
+confirmation*. Until it is confirmed, only the active/inactive state
+determines eligibility.
+
+**Batch size**
+
+Admin configures a round-robin **batch size for each team**. The batch
+size determines how many consecutive Leads one eligible team member
+receives before assignment rotates to the next eligible member of the
+same team.
+
+Example, for one team with batch size 1:
+
+> Team: Kochi Health Team
+>
+> Eligible: Arun (Team Lead), Sneha (Salesperson), Joseph (Salesperson)
+>
+> Lead 1 → Arun
+>
+> Lead 2 → Sneha
+>
+> Lead 3 → Joseph
+>
+> Lead 4 → Arun
+
+The same team with batch size 10:
+
+> Leads 1–10 → Arun
+>
+> Leads 11–20 → Sneha
+>
+> Leads 21–30 → Joseph
+>
+> Leads 31–40 → Arun
+
+Rules:
+
+> • Rotation stays entirely inside the selected team.
+>
+> • Each team has its own batch size and its own rotation position.
+>
+> • Admin and Manager never enter the rotation.
+>
+> • A batch size of zero or a negative value must not be accepted.
+>
+> • Changing the batch size or the eligible members affects future
+> automatic assignments only. Existing Lead ownership is never
+> rewritten.
+>
+> • Batch configuration is an assignment rule, not a security
+> permission. Configuring it does not change any role's visibility or
+> authorization.
+
+The default batch size and the maximum permitted batch size are *pending
+client confirmation*.
+
+**Empty or unavailable team pool**
+
+If the selected team has no eligible active recipient, automatic
+assignment must fail safely and visibly.
+
+> • The Lead must not be assigned to an Admin or a Manager.
+>
+> • The Lead must not be assigned to a user from another team.
+>
+> • The system must not invent a fallback owner.
+>
+> • The condition must be surfaced to an authorized supervisor rather
+> than being silently ignored.
+
+Whether the Lead remains Unassigned against the destination team, or
+triggers another escalation flow, is *pending client confirmation*.
+
+**Unassigned Leads**
+
+Unassigned Leads remain visible to the Admins and Managers whose scope
+covers the destination team, and to that team's Team Lead, under
+Section 2.3.
+
+**Auditability**
+
+Automatic assignment, manual assignment and every reassignment are
+auditable actions. Detailed audit-history requirements are defined in
+Section 208.
+
+Action-level questions about which roles may perform which assignment
+operations remain governed by the pending fixed permission matrix in
+Section 188.
+
+
+**190. Lead Sources**
+
+Navigation:
+
+Settings → Lead Sources
+
+Admin can manage the Lead Source options used across A&S Fincare.
+
+Example options:
 
 > • Website
 >
@@ -7117,7 +10597,11 @@ Default options:
 >
 > • Campaign
 >
+> • Existing Customer
+>
 > • Other
+
+These are examples. A&S Fincare's actual sources are entered by Admin.
 
 Actions:
 
@@ -7125,18 +10609,28 @@ Actions:
 >
 > • Rename
 >
+> • Reorder
+>
 > • Deactivate
+>
+> • Reactivate
 
 Deactivating a source prevents future selection but retains existing
-Lead history.
+Lead history, and Leads that already hold the value continue to display
+it correctly.
 
-**165. Pipeline**
+Lead Source is configurable business data. Configuring it does not change
+any role's visibility, ownership or authorization. See Section 2.6.
+
+Lead Source is available as a reporting dimension, as defined in
+Section 171.
+**191. Pipeline**
 
 Navigation:
 
 Settings → Pipeline
 
-Owner/Admin can:
+Admin can:
 
 > • Add Stage
 >
@@ -7153,19 +10647,180 @@ before the stage can be deactivated.
 
 Historical stage information must be retained.
 
-**166. Products & Services**
+Pipeline stage describes **where a Lead is in the sales process**. It is
+a different field from Lead Priority, which describes **how urgent or
+promising the Lead is**. The two are configured separately, stored
+separately and never substituted for one another. See Section 192.
+
+**192. Lead Priority**
 
 Navigation:
 
-Settings → Products & Services
+Settings → Lead Priority
 
-This area defines the Products or Services offered by the business.
+Lead Priority is a first-class field on every Lead. It is separate from
+pipeline stage and must never be merged with it or presented as a stage.
+
+**Initial values**
+
+> • Hot
+>
+> • Warm
+>
+> • Cold
+
+These are the initial active values. They are configurable data, not
+fixed constants.
+
+**Admin configuration**
+
+Admin can:
+
+> • Add a priority value
+>
+> • Rename a priority value
+>
+> • Reorder priority values
+>
+> • Deactivate a priority value
+>
+> • Reactivate a priority value
+
+Configuring Lead Priority values is **configurable business data**. It
+does not change any role's visibility, ownership or authorization, and
+must never be presented as a permission setting. See Section 2.6.
+
+**Rules**
+
+> • Every Lead has exactly one current priority.
+>
+> • Priority is independent of pipeline stage. A Lead may be Hot at any
+> stage, and moving stage does not change priority.
+>
+> • Deactivating a priority value prevents it from being selected for
+> new Leads and for future priority changes. It must not be silently
+> erased from Leads that already hold it, and it must continue to
+> display correctly on those Leads and in history.
+>
+> • Priority changes are recorded in the Lead's activity history and are
+> auditable actions. Detailed audit-history requirements are defined in
+> Section 208.
+>
+> • Priority visibility follows the reporting hierarchy in Section 2.3,
+> exactly as for the Lead itself. Priority never widens who can see a
+> Lead.
+
+**Where priority must be available**
+
+> • Add Lead — Section 38
+>
+> • Edit Lead
+>
+> • Lead Detail and Lead Information — Sections 41 and 43
+>
+> • Leads list column, filter and sort — Section 37
+>
+> • Lead Pipeline cards — Section 39
+>
+> • Lead Pipeline dashboard widget — Section 21
+>
+> • Dashboards
+>
+> • Reports
+>
+> • Lead import mapping
+>
+> • Lead export
+
+Reporting, import and export detail for Lead Priority is defined in
+Sections 171, 149 and 163. This section defines the field itself.
+
+
+**193. Product Catalogue**
+
+Navigation:
+
+Settings → Product Catalogue
+
+The catalogue is the shared reference data describing what A&S Fincare
+distributes. It has three levels, defined in Section 66:
+
+> • Product Category
+>
+> • Provider
+>
+> • Plan / Sub-product
+
+A Customer Purchase records that a Customer acquired one specific
+Plan/Sub-product. The catalogue itself holds no customer data.
+
+**General rules**
+
+> • Catalogue records are reference data. They are never the Record
+> Owner or assignee of an operational record.
+>
+> • Catalogue visibility is not restricted by the reporting hierarchy;
+> every role needs to read the catalogue to do their work. The
+> operational records that reference it remain restricted under
+> Section 2.3.
+>
+> • Deactivating a catalogue record prevents future selection. It must
+> not delete, alter or invalidate existing Customer Purchases, their
+> Closed Amount, their documents or their history.
+>
+> • Admin-defined custom fields are **not** available on catalogue
+> records. Custom fields apply only to Leads, Customers and Customer
+> Purchases. See Section 194.
+>
+> • The catalogue does not define provider integrations. V1 does not
+> connect to any provider system.
+
+## 193.1 Product Categories
+
+A Product Category is the broad class of insurance product, for example
+Health Insurance or Motor Insurance.
 
 Fields:
 
-> • Name — required
+> • Category Name — required
 >
 > • Description — optional
+>
+> • Status — Active / Inactive
+
+Actions:
+
+> • Add
+>
+> • Rename
+>
+> • Reorder
+>
+> • Deactivate
+>
+> • Reactivate
+
+A Product Category may contain Plans from multiple Providers.
+
+A Category cannot be deactivated while it has active Providers or Plans
+still available for selection. Those must be deactivated first.
+
+## 193.2 Providers
+
+A Provider is the insurer or issuing company whose products A&S Fincare
+distributes, for example Star Health.
+
+Fields:
+
+> • Provider Name — required
+>
+> • Product Categories the Provider operates in
+>
+> • Reference / code, where A&S Fincare uses one — optional
+>
+> • Description — optional
+>
+> • Status — Active / Inactive
 
 Actions:
 
@@ -7177,35 +10832,113 @@ Actions:
 >
 > • Reactivate
 
-Example:
+A Provider may offer multiple Plans, across more than one Product
+Category.
 
-**Insurance**
+Deactivating a Provider prevents its Plans from being selected for new
+Customer Purchases. Existing purchases are unaffected.
 
-> • Health Insurance
+## 193.3 Plans / Sub-products
+
+A Plan is the specific named product a Customer can buy, for example
+Family Health Optima.
+
+Fields:
+
+> • Plan Name — required
 >
-> • Motor Insurance
+> • Product Category — required
+>
+> • Provider — required
+>
+> • Description — optional
+>
+> • Required policy documents — see Section 193.4
+>
+> • Status — Active / Inactive
 
-**PUC Centre**
+Actions:
 
-> • Pollution Certificate
+> • Add
+>
+> • Edit
+>
+> • Deactivate
+>
+> • Reactivate
 
-A Product/Service definition is different from an individual Customer
-Product/Service record.
+Each Plan belongs to exactly one Product Category and exactly one
+Provider.
 
-Deactivating a Product/Service prevents future selection but does not
-remove existing Customer records or history.
+A Customer Purchase always references a Plan. A Customer never purchases
+a Product Category or a Provider directly.
 
-**167. Custom Fields**
+Deactivating a Plan prevents it from being selected for new Customer
+Purchases. Existing purchases keep their Plan reference, their history
+and their renewal cycles.
+
+The names used above are examples of the shape of the data. They are not
+a fixed or seeded catalogue. A&S Fincare's actual categories, providers
+and plans are entered by Admin.
+
+## 193.4 Required Policy Document Definitions
+
+Each Customer Purchase has a checklist of required policy documents,
+used to gate the `Closed/Active` status as defined in Section 68.1.
+
+The requirement at purchase level is fixed:
+
+> • a Customer Purchase must know which policy documents are required
+> for it
+>
+> • it must know which of those are present and which are missing
+>
+> • it cannot be marked `Closed/Active` while any required document is
+> missing
+
+**Pending client confirmation**
+
+These questions are collected in the consolidated register in
+Section 212.
+
+The administrative level at which the required-document list is
+maintained is not yet decided. It may be defined per Product Category,
+per Provider, per Plan, per individual purchase, or as a combination.
+This is *pending client confirmation*.
+
+Until it is confirmed, the specification requires only that each
+Customer Purchase resolves to a definite list of required documents and
+reports its completeness. Implementation must not assume a particular
+administration level.
+
+
+**194. Custom Fields**
 
 Navigation:
 
 Settings → Custom Fields
 
-Owner/Admin can create additional fields for:
+Admin can create additional fields for exactly three record types:
 
-> • Leads
+> • Lead
 >
-> • Customers
+> • Customer
+>
+> • Customer Purchase
+
+**Scope of custom fields**
+
+Custom fields are supported for these three record types only. They are
+not available on Product Categories, Providers, Plans/Sub-products,
+teams, users, follow-ups, renewals, conversations or any other record
+type, and they are never used to define roles or permissions.
+
+Each definition belongs to exactly one supported record type, and its
+values are stored on individual records of that type.
+
+Custom fields are configurable business data. A custom field cannot
+change a record's visibility, ownership or authorization. See
+Section 2.6.
 
 Supported V1 types:
 
@@ -7223,7 +10956,7 @@ Fields:
 
 > • Field Name
 >
-> • Applies To
+> • Applies To — Lead, Customer or Customer Purchase
 >
 > • Field Type
 >
@@ -7243,24 +10976,60 @@ Actions:
 >
 > • Reactivate
 
+**Validation**
+
+Values are validated according to the field type: a Number field must
+contain a valid numeric value, a Date field a recognizable date, and a
+Dropdown field an allowed option or a value flagged for review. The same
+validation applies whether the value is entered in the interface or
+supplied by an import.
+
+**Visibility and authorization**
+
+A custom field value is part of the record that holds it. It follows that
+record's visibility under Section 2.3 and is never visible to a user who
+cannot see the record. A user who can see a record but whose fixed role
+does not permit editing it cannot edit its custom fields either.
+
+**Import and export**
+
 Configured custom fields appear on relevant Add/Edit screens and in
-import mapping.
+import column mapping, as defined in Section 151. Custom field values are
+included in exports only within the requesting user's authorized scope,
+as defined in Sections 162 and 163.
 
-Deactivating a field must retain existing stored values.
+**Reporting**
 
-Removing a used Dropdown option prevents future selection but retains
-existing values. Making an existing custom field Required does not
-invalidate existing records that do not yet contain a value.
+Custom fields are available as reporting dimensions only where this
+specification explicitly supports it. They are not automatically added to
+every report, filter or breakdown.
 
-**168. Reminder Settings**
+**Historical safety**
+
+> • Deactivating a field must retain existing stored values, and those
+> values must remain readable on the records that hold them.
+>
+> • Removing a used Dropdown option prevents future selection but
+> retains existing values.
+>
+> • Making an existing custom field Required does not invalidate
+> existing records that do not yet contain a value.
+>
+> • Renaming a field must not rewrite historical activity or audit
+> entries that recorded the previous name.
+
+Changes to custom-field definitions are significant configuration
+changes and are auditable. See Section 208.
+**195. Reminder Settings**
 
 Navigation:
 
 Settings → Reminder Settings
 
-Owner/Admin can configure default renewal reminder schedules.
+Admin configures the default renewal reminder schedule used when a new
+reminder schedule is created for a Customer Purchase.
 
-Example:
+Example schedule:
 
 > • 30 days before
 >
@@ -7278,23 +11047,114 @@ For each reminder, select:
 
 These defaults apply when new reminder schedules are created.
 
-Authorized users may override them for an individual Customer
-Product/Service.
+Authorized users may override them for an individual Customer Purchase.
 
-Changing the default should not silently modify reminder schedules
-already created for existing records.
+Changing the default must not silently modify reminder schedules already
+created for existing records.
 
-WhatsApp can be selected as a reminder channel only when the WhatsApp
-module is enabled. If the connection or required template is
-unavailable, the configuration should clearly show that automated
-WhatsApp sending cannot operate until the issue is resolved. Existing
-configuration should not be silently replaced or changed.
+WhatsApp can be selected as a reminder channel only when an active
+WhatsApp connection and an eligible message template are available. If
+the connection or required template is unavailable, the configuration
+must clearly show that automated WhatsApp sending cannot operate until
+the issue is resolved. Existing configuration must not be silently
+replaced or changed.
 
-Email may be selected only when the Email module is enabled and the workspace has a verified sender and an active reminder template.
+Email may be selected only when a verified sender and an active reminder
+template are available.
 
 If the sender or required template is unavailable, the configuration should clearly show that automated Email sending cannot operate until the issue is resolved. Existing configuration must not be silently replaced or changed.
 
-**169. WhatsApp Settings**
+The example schedule above is illustrative. The reminder schedules A&S
+Fincare will actually use are *pending client confirmation*.
+
+## 195.1 Renewal Automation
+
+Renewal tracking and automatic renewal reminders are part of V1. They
+are not an optional feature and cannot be switched off as a module.
+
+**Required behaviour**
+
+> • Renewal information is held against the relevant Customer Purchase,
+> not against the Customer as a whole.
+>
+> • The system identifies upcoming and overdue renewals and presents
+> them in the due and overdue work views defined in Section 70.
+>
+> • The system sends renewal reminders automatically through the
+> configured communication channels when a scheduled reminder time is
+> reached.
+>
+> • Internal in-app alerts and notifications are raised for the
+> responsible user.
+>
+> • Authorized users may still send a manual reminder, as defined in
+> Section 75.
+>
+> • Every reminder attempt and its outcome is recorded against the
+> Customer Purchase and the Customer activity timeline.
+
+**Delivery integrity**
+
+These rules are mandatory and must not be relaxed:
+
+> • A failed send must never be shown as successful.
+>
+> • A failed reminder must be recorded as failed, with the available
+> reason, and surfaced to the appropriate user.
+>
+> • A reminder instance must not be sent twice because of a retry, a
+> page refresh or a repeated background-job execution.
+>
+> • A failed reminder does not silently become sent later; only a
+> successful retry or send changes its outcome.
+
+The existing retry and idempotency protections defined in the WhatsApp
+and Email chapters are preserved unchanged.
+
+**Platform rules**
+
+> • Automatic WhatsApp reminders must respect Meta platform rules,
+> including template eligibility, messaging eligibility, consent and
+> opt-out.
+>
+> • Automatic Email reminders must respect sender verification, active
+> template requirements and opt-out.
+>
+> • A recipient who has opted out of a channel must be excluded from
+> automated sending on that channel.
+
+**Access**
+
+Renewal views, alerts and reminder history follow the reporting
+hierarchy in Section 2.3. A user sees renewals for Customer Purchases
+within their permitted scope only.
+
+**Pending client confirmation**
+
+These questions are collected in the consolidated register in
+Section 212.
+
+> • exact reminder schedules
+>
+> • channel order or preference when more than one channel is configured
+>
+> • reminder template content
+>
+> • escalation rules when a renewal becomes overdue with no response
+>
+> • retry timing and the number of retries
+>
+> • consent handling details
+>
+> • opt-out handling details
+>
+> • who is operationally responsible for overdue renewals
+
+The detailed WhatsApp and Email delivery workflows are defined in their
+own chapters and are not restated here.
+
+
+**196. WhatsApp Settings**
 
 Navigation:
 
@@ -7302,7 +11162,10 @@ Settings → WhatsApp
 
 V1 supports:
 
-**One WhatsApp business messaging connection/number per workspace.**
+**One WhatsApp business messaging connection/number for A&S Fincare.**
+
+The connection belongs to the organization. Every team uses the same
+number; there is no per-team, per-Manager or per-user number.
 
 Show:
 
@@ -7333,13 +11196,24 @@ Actions:
 Disconnecting WhatsApp requires confirmation and does not delete
 existing conversation history.
 
-**170. WhatsApp Templates**
+A shared organization number does not widen who can read a conversation.
+Conversation visibility always follows Section 89.1, regardless of the
+fact that all messages arrive on one number.
 
-Owner/Admin can view templates available to the CRM.
+
+**197. WhatsApp Templates**
+
+Navigation:
+
+Settings → WhatsApp Templates
+
+Admin can view the templates available to the CRM.
 
 Show:
 
 > • Template Name
+>
+> • Language
 >
 > • Status
 >
@@ -7355,19 +11229,30 @@ Statuses may include:
 >
 > • Unavailable
 
-Only eligible templates may be used.
+Only templates that are currently approved and eligible under Meta rules
+may be selected for sending.
 
 V1 template management means **viewing/syncing available templates and
 using them inside the CRM**. It does not reproduce the complete WhatsApp
-template creation and approval system.
+template creation and approval system. Where creation, approval or
+platform-level editing must occur in the connected WhatsApp platform,
+the CRM directs the administrator there rather than implying the action
+completed locally.
 
-## 170.1 Email Settings
+Template administration is configurable business data. It does not
+change any role's visibility, ownership or authorization, and must never
+be presented as a permission setting. See Section 2.6.
+
+Available variables are listed in Section 98.
+
+
+**198. Email Settings**
 
 Navigation:
 
 Settings → Email
 
-Owner/Admin can configure one Email sender identity for the workspace.
+Admin configures the single A&S Fincare Email sender identity.
 
 Show:
 
@@ -7375,11 +11260,13 @@ Show:
 >
 > • Sender Email Address
 >
+> • Sending Domain
+>
 > • Reply-To Address
 >
 > • Verification Status
 >
-> • Connection / Configuration Status
+> • Provider Configuration Status
 
 Actions:
 
@@ -7390,20 +11277,31 @@ Actions:
 > • Recheck Verification
 >
 > • Update
->
-> • Disable
 
-Disabling Email requires confirmation and does not delete existing Email activity or template history.
+Changing or replacing a verified sender requires confirmation and does
+not delete existing Email activity or template history.
 
-Email service credentials and secrets must never be exposed to client-side code.
+Email service credentials and secrets must never be exposed to
+client-side code, and must never be displayed in this screen, in logs or
+in exported data. The screen shows configuration *state* only, never
+secret values.
 
-## 170.2 Email Templates
+**Email is not an optional module**
+
+Email is a required functional area of V1 and cannot be switched off.
+This screen configures how Email sends; it does not decide whether the
+Email module exists. A missing or unverified sender is a configuration
+state that makes Email actions unavailable with an explanation. It does
+not disable the module and must not block unrelated CRM functionality.
+
+
+**199. Email Templates**
 
 Navigation:
 
 Settings → Email Templates
 
-Owner/Admin can:
+Admin can:
 
 > • Add
 >
@@ -7435,155 +11333,132 @@ Only active templates may be selected for new messages or reminders.
 
 Deactivating a template must not change previously sent Email history.
 
-**171. Modules & Features**
+Email templates are configurable business data. Creating or editing a
+template does not change any role's visibility, ownership or
+authorization, and must never be presented as a permission setting. See
+Section 2.6.
 
-Navigation:
+Available variables are listed in Section 128.
 
-Settings → Modules & Features
 
-Owner/Admin can enable or disable applicable modules:
+**200. Application Scope Is Fixed**
+
+A&S Fincare V1 has a single defined product scope, listed in
+Section 211. There is no Modules & Features screen, and no
+administrator-facing switch that enables or disables a part of the
+application.
+
+The following are always present and cannot be turned off:
 
 > • Leads
 >
-> • Customer Follow-ups
+> • Customers
 >
-> • Products & Services
+> • Customer Purchases
+>
+> • Follow-ups
 >
 > • Renewals & Reminders
 >
 > • WhatsApp
 >
 > • Email
-
-
-Customer Management remains a core module and cannot be disabled.
-
-Example:
-
-**A PUC centre may disable Leads and use:**
-
-**Customer**
-
-↓
-
-**Product / Service**
-
-↓
-
-**Expiry**
-
-↓
-
-**Reminder**
-
-↓
-
-**WhatsApp**
-
-↓
-
-**Renewal**
-
-Disabling a module hides its normal navigation and entry points but does
-not delete existing data.
-
-Disabling Email prevents future Email sending and hides normal Email actions. It does not delete Email templates, configuration history or previously recorded Email activity.
-
-**172. Module Dependencies**
-
-Some features depend on other modules or configuration and cannot
-operate independently.
-
-> **• Renewals & Reminders** requires **Products & Services**.
 >
-> **• Automated WhatsApp renewal reminders** require **Renewals &
-> Reminders**, **WhatsApp**, an active WhatsApp connection, and an
-> eligible message template.
+> • Reports
 >
-> **• Lead Assignment** and **Pipeline configuration** are available
-> only when **Leads** is enabled.
+> • Data Import & Export
 >
-> **• Import Leads** is available only when **Leads** is enabled.
+> • Settings & Administration
+
+What a given user sees of each area is determined by their fixed role and
+their position in the reporting hierarchy, never by a module switch. See
+Section 2.3.
+
+**Configuration is not the same as scope**
+
+Admin configures **business data** where this specification approves it —
+teams and reporting lines, Lead Priority values, pipeline stages, the
+product catalogue, required policy-document definitions, reminder
+defaults, incentive rules, templates and the Email sender.
+
+Admin does not configure **application scope** or **access control**.
+Role capabilities, visibility rules and the presence of core
+functionality are fixed by the application and changed only by a
+reviewed application change and a new release.
+
+Where a capability appears unavailable, it is because its configuration
+is incomplete or the user's role does not permit it — not because a
+module was switched off. Configuration dependencies are defined in
+Section 201.
+**201. Configuration Dependencies and Implementation Constraints**
+
+Some capabilities depend on configuration being complete, or on an
+external platform being available. These are **implementation
+constraints**, not administrator-facing toggles. An Admin cannot switch
+a capability off; they can only leave its configuration incomplete, and
+the application must then explain what is missing.
+
+**Configuration-state dependencies**
+
+> • **Automatic WhatsApp renewal reminders** require an active WhatsApp
+> connection and an eligible approved message template.
 >
-> • New **Customer Product/Service** records can be created only when
-> **Products & Services** is enabled.
+> • **WhatsApp sending** requires an active WhatsApp connection.
 >
-> • WhatsApp sending is available only when the **WhatsApp module** is
-> enabled and the workspace has an active WhatsApp connection.
+> • **Email sending** requires a verified A&S Fincare Email sender.
 >
-> • Email sending requires the Email module and a verified workspace sender.
+> • **Automatic Email renewal reminders** require a verified sender and
+> an active Email template.
 >
-> • Automated Email renewal reminders require Renewals & Reminders, Email, a verified sender and an active Email template.
+> • **Controlled bulk Email reminders** require a verified sender and an
+> active Email template.
 >
-> • Controlled bulk Email reminders require Renewals & Reminders and Email.
-
-**Dependency Behaviour**
-
-When Owner/Admin attempts to disable a module that another enabled
-feature depends on, the CRM should **block the change** and explain
-which dependent feature must be disabled first.
-
-Example:
-
-> **Products & Services cannot be disabled while Renewals & Reminders is
-> enabled.  
-> ** Disable Renewals & Reminders first.
-
-The following dependency rules apply:
-
-**Attempted Change**
-
-**CRM Behaviour**
-
-Disable Products & Services while Renewals & Reminders is enabled
-
-Block and require Renewals & Reminders to be disabled first
-
-Disable Leads
-
-Also hide Lead Assignment, Pipeline and Import Leads
-
-Disable WhatsApp
-
-Stop new WhatsApp sending and automated WhatsApp reminders; retain
-existing conversation history
-
-Disconnect WhatsApp
-
-Keep the WhatsApp module and existing history available, but disable
-sending until reconnected
-
-Required WhatsApp template becomes unavailable
-
-Prevent the affected automated/template send and show the configuration
-problem
-
-Disable Renewals & Reminders
-
-Stop new renewal reminder activity and cancel future scheduled reminder
-instances after confirmation; retain renewal/reminder history
-
-Disabling a module:
-
-> • hides its normal navigation and creation actions
+> • **Renewal reminders for a Customer Purchase** require a Renewal Date
+> and a reminder schedule.
 >
-> • prevents new activity belonging to that module
+> • **A Customer Purchase** requires an active Plan/Sub-product in the
+> catalogue, which in turn requires its Provider and Product Category.
 >
-> • does not delete existing or historical data
+> • **Marking a Customer Purchase `Closed/Active`** requires its
+> required policy documents to be complete.
 >
-> • does not silently disable another module without informing the user
+> • **Automatic Lead assignment** requires a destination team with at
+> least one eligible active recipient.
+>
+> • **Incentive calculation** requires configured slabs and rules, and
+> eligible Closed Amount from `Closed/Active` purchases.
 
-If the module is re-enabled later, retained data should become
-accessible again according to user permissions.
+**Required behaviour when configuration is incomplete**
 
-**173. Data Import / Export**
+> • The affected action is unavailable and the interface explains
+> precisely what is missing and who can resolve it.
+>
+> • Unrelated CRM functionality continues to work normally.
+>
+> • Nothing is silently skipped. An action that could not be performed
+> is never recorded as performed.
+>
+> • Existing data and history are never deleted or altered because
+> configuration became incomplete.
+>
+> • Restoring the configuration restores the capability. It does not
+> retroactively perform actions that were missed while it was
+> incomplete.
+
+**Deactivating configuration data**
+
+Deactivating a catalogue entry, Lead Priority value, pipeline stage or
+custom field prevents future selection. It never removes, rewrites or
+invalidates existing records, their history or their audit entries. See
+Section 207.
+**202. Data Import / Export**
 
 Navigation:
 
 Settings → Data Import / Export
 
 Provides access to the import/export functionality defined in the Data
-Import & Export section.
+Import & Export chapter.
 
 Show:
 
@@ -7591,14 +11466,15 @@ Show:
 >
 > • Import Customers
 >
-> • Import History
+> • Import History, including the assignment strategy used for each
+> import
 >
 > • permitted Export actions
 
 This screen should reuse the existing import/export workflow rather than
-duplicate it.
-
-**174. Important Settings Behaviour**
+duplicate it, and is subject to the same hierarchy scope and role rules
+defined in Sections 162 and 166.
+**203. Important Settings Behaviour**
 
 Significant administrative actions require confirmation, including:
 
@@ -7606,25 +11482,40 @@ Significant administrative actions require confirmation, including:
 >
 > • change user role
 >
+> • change a team's Team Lead
+>
+> • move a team to another Manager
+>
+> • change a user's team
+>
+> • change a team's round-robin batch size
+>
 > • deactivate pipeline stage
 >
-> • deactivate Product/Service
+> • deactivate or rename a Lead Priority value
+>
+> • deactivate a Product Category, Provider or Plan/Sub-product
+>
+> • change required policy-document definitions
+>
+> • change incentive rules or slabs
 >
 > • disconnect WhatsApp
->
-> • disable a module
->
-> • disable Email
 >
 > • change or remove the verified Email sender
 
 Configuration changes should stop or affect **future use without
 deleting historical CRM data** unless explicitly stated otherwise.
 
-Users should only see settings and actions they have permission to
-access.
+Confirmation must explain the consequence. Where a change affects who
+can see existing records — for example moving a team to another Manager
+— the confirmation must say so.
 
-**175. Notifications**
+Users should only see settings and actions their fixed role permits.
+Hiding a setting is not authorization; the server must enforce it.
+
+Significant configuration changes are auditable. See Section 208.
+**204. Notifications**
 
 Notifications alert users about CRM activity that requires attention.
 
@@ -7636,7 +11527,7 @@ Show:
 
 > • Notification
 >
-> • Related Lead / Customer / Activity
+> • Related Lead / Customer / Customer Purchase / Activity
 >
 > • Date / Time
 >
@@ -7648,6 +11539,8 @@ Newest notifications appear first.
 
 > • Lead / Customer assigned to you
 >
+> • Customer Purchase assigned to you
+>
 > • Follow-up due / overdue
 >
 > • Renewal due / overdue
@@ -7655,6 +11548,9 @@ Newest notifications appear first.
 > • new WhatsApp reply
 >
 > • WhatsApp conversation assigned
+>
+> • unassigned WhatsApp conversation awaiting assignment — Admins and
+> Managers only
 >
 > • WhatsApp message / scheduled reminder failed
 >
@@ -7666,12 +11562,29 @@ Newest notifications appear first.
 >
 > • controlled bulk Email reminder completed or partially failed
 >
-> • workspace Email sender requires administrator attention
+> • Email sender requires administrator attention
+>
+> • required policy documents outstanding on a Customer Purchase
 >
 > • import completed / failed
+>
+> • role, team or reporting-line change affecting you
 
 Notifications should be sent only to the relevant user, such as the
-assigned user or the user who initiated the action.
+assigned operational owner or the user who initiated the action.
+
+**Scope**
+
+Notification content and delivery follow the reporting hierarchy in
+Section 2.3. A notification must never reveal a record, customer name,
+message content or figure outside the recipient's permitted scope,
+including in its title, preview text or badge count. Unread counts are
+scoped the same way.
+
+Opening a notification must reauthorize access on the server. If the
+user's access changed after the notification was created, the
+destination must deny access safely and explain that the item is no
+longer available, without disclosing where it went or what it contained.
 
 Selecting a notification should open the relevant CRM record, activity
 or result where possible.
@@ -7689,21 +11602,47 @@ should not notify users for routine successful actions that do not
 require attention.
 
 Mobile should support the same notification list, with links opening the
-relevant mobile screen where available.
+relevant mobile screen where available. Mobile enforces the same scope
+as desktop.
 
 V1 notifications are in-app only. Installing the CRM as an application
 does not enable operating-system push notifications. Web Push and
 scheduled background notifications are outside V1.
+**205. Policy Documents**
 
-**176. Documents**
+Documents in V1 are **policy-related documents** belonging to a Customer
+Purchase.
 
-Documents allow users to store files related to a Customer and, where
-applicable, a specific Customer Product/Service.
+Documents are available from the Customer Purchase Detail screen and are
+summarised on the Customer Profile.
 
-Documents are available from the **Customer Profile**.
+**Scope of V1**
+
+V1 covers documents relating to the policy or product purchased, for
+example the policy schedule, the policy certificate, the proposal or
+application form, and endorsement or renewal documents. The exact
+required set per plan is configured as described in Section 193.4.
+
+V1 does **not** require:
+
+> • personal identity documents
+>
+> • KYC documents
+>
+> • general personal documents unrelated to the policy
+>
+> • document approval
+>
+> • document review or approval queues
+
+Personal and KYC document handling is outside this requirement. If A&S
+Fincare later needs it, it is a separate approved change.
 
 Show:
 
+> • Document Type — the required document this file satisfies, where
+> applicable
+>
 > • File Name
 >
 > • File Type
@@ -7712,7 +11651,7 @@ Show:
 >
 > • Uploaded Date
 >
-> • Related Product/Service, where applicable
+> • Related Customer Purchase
 >
 > • Actions
 
@@ -7724,10 +11663,12 @@ Actions:
 >
 > • Download
 >
-> • Delete / Archive, based on permission
+> • Replace
+>
+> • Delete / Archive
 
-Documents should remain available when a Customer or Product/Service is
-archived.
+Documents must remain available when a Customer or Customer Purchase is
+archived. Uploaded policy documents are retained for future reference.
 
 V1 does not include:
 
@@ -7741,12 +11682,197 @@ V1 does not include:
 >
 > • complex folder structures
 
-For V1, Documents should belong to **Customers only**, not Leads.
+**Documents are not required for a Lead**
 
-If a document relates to a specific Customer Product/Service, the user
-can optionally link it to that record.
+Documents are not collected while a person is still a Lead, and no
+document is required in order to convert a Lead into a Customer or to
+create a Customer. See Sections 52 and 60.
 
-**177. System-Wide Behaviour**
+**Relationship to purchase closure**
+
+A Customer Purchase cannot be marked `Closed/Active` until every
+required policy document for that purchase has been uploaded. Uploading
+the required documents is sufficient; no approval step follows. This is
+defined in Sections 68.1 and 68.2.
+
+**Access**
+
+Document visibility and actions follow the reporting hierarchy in
+Section 2.3. A user who cannot see the Customer Purchase cannot see,
+download or act on its documents. Access must be enforced server-side;
+hiding an upload or download control is not authorization.
+
+Document uploads, replacements and removals are auditable actions.
+Detailed audit-history requirements are defined in Section 208.
+
+Which roles may upload, replace or remove policy documents is *pending
+client confirmation before security implementation and UAT* and is
+listed in Section 188.
+
+**206. Performance and Incentive Engine**
+
+V1 includes a configurable incentive engine. It calculates incentives
+from the Closed Amount of qualifying Customer Purchases, using
+configurable achievement slabs and rules.
+
+This section defines what the engine must do. The business values it
+operates on are not yet confirmed and are listed at the end of this
+section.
+
+**Inputs**
+
+The engine records and uses the eligible **Closed Amount** of qualifying
+Customer Purchases, as defined in Section 68.3. A purchase contributes
+only once it is `Closed/Active`, which in turn requires its required
+policy documents to be complete.
+
+**Aggregation**
+
+The engine must aggregate eligible Closed Amount by:
+
+> • Salesperson
+>
+> • Team Lead
+>
+> • team
+>
+> • Manager
+>
+> • reporting period
+
+**Personal production and hierarchical roll-ups are different figures**
+
+The specification must keep these distinct everywhere they appear:
+
+> • **Salesperson production** — eligible Closed Amount from purchases
+> that Salesperson owns.
+>
+> • **Team Lead personal production** — eligible Closed Amount from
+> purchases the Team Lead personally owns. A Team Lead may personally
+> work Leads and close sales.
+>
+> • **Team total** — the team's combined eligible Closed Amount: the
+> Team Lead's personal production plus that of the Salespersons in the
+> team.
+>
+> • **Manager branch total** — the combined eligible Closed Amount of
+> all teams in that Manager's reporting hierarchy.
+>
+> • **Organization total** — the combined eligible Closed Amount across
+> the organization, visible to Admin.
+
+A Team Lead's personal production must never be presented as, or merged
+into, their team total without being separately identifiable. A Manager
+or Admin total is a supervisory roll-up: Managers and Admins do not own
+Customer Purchases and have no personal production. See Section 2.5.
+
+**Configuration**
+
+The engine must support:
+
+> • configurable achievement slabs
+>
+> • configurable incentive rules
+>
+> • configurable reporting periods
+
+Incentive rules and slabs are **configurable business data**. Configuring
+them does not change any role's visibility, ownership or authorization,
+and must never be presented as a permission setting. See Section 2.6.
+
+**Calculation and traceability**
+
+The engine must calculate an incentive result and retain enough
+information to explain it. For any result, an authorized user must be
+able to see:
+
+> • which Customer Purchases were counted as eligible
+>
+> • the eligible Closed Amount contributed by each
+>
+> • the reporting period used
+>
+> • the slab and rule that produced the result
+>
+> • the rule version in force when the result was calculated
+>
+> • when the calculation ran
+
+A result whose inputs later change must be recalculable, and a
+recalculation must not silently overwrite the record of the previous
+result.
+
+**Visibility**
+
+Incentive figures follow the reporting hierarchy in Section 2.3:
+
+> • A Salesperson sees their own production and their own incentive
+> result.
+>
+> • A Team Lead sees their own production and result, and their team's.
+>
+> • A Manager sees their own reporting branch.
+>
+> • Admin sees the organization.
+
+A Manager must not see another Manager's branch, and a Team Lead must
+not see another Team Lead's team, including through a comparison,
+ranking, benchmark, percentage or denominator.
+
+**Reporting**
+
+Incentive and performance figures must be available through the Reports
+module. Report layouts, filters and exports are defined in Sections
+176 and 177.
+
+**Not in scope**
+
+The engine is not a payroll or accounting module. V1 does not include
+salary processing, tax handling, statutory deductions or ledger
+integration.
+
+**Pending client confirmation**
+
+These questions are collected in the consolidated register in
+Section 212.
+
+The following are *pending client confirmation before security
+implementation and UAT*. No value, formula or rule should be assumed or
+illustrated until confirmed:
+
+> • incentive formulas
+>
+> • incentive percentages
+>
+> • slab thresholds and the number of slabs
+>
+> • which Customer Purchases qualify
+>
+> • eligibility dates and how they are determined
+>
+> • reporting periods and period cut-offs
+>
+> • how Team Lead incentives are calculated, including the treatment of
+> personal production versus team total
+>
+> • how Manager incentives, if any, are calculated
+>
+> • cancellation, lapse, refund and reversal handling, and its effect on
+> a previously calculated result
+>
+> • approval of calculated incentives
+>
+> • payment timing and payment status workflow
+>
+> • whether a rule change applies retrospectively
+>
+> • which role may configure incentive rules and slabs
+
+Until these are confirmed, the specification defines the engine's
+required capability only. It does not define its arithmetic.
+
+
+**207. System-Wide Behaviour**
 
 The following rules apply across the CRM and should be interpreted
 consistently in all modules.
@@ -7758,29 +11884,71 @@ consistently in all modules.
 > • Follow-ups, Renewal actions and WhatsApp conversations use
 > **Assigned To**.
 >
+> • A Customer Purchase belongs to a Customer and has its own
+> responsible operational user, which may differ from the Customer's
+> Record Owner.
+>
+> • **Record Owner and Assigned To may only ever be a Team Lead or a
+> Salesperson.** Admins and Managers are supervisory and are never
+> operational owners or assignees. See Section 2.5.
+>
 > • Operational actions may initially inherit the related
-> Lead/Customer's Record Owner.
+> Lead/Customer's Record Owner. Follow-up and renewal work defaults to
+> that permitted operational owner unless it is reassigned under the
+> rules in Sections 55 and 71.
 >
 > • Changing **Assigned To** does not change the Lead/Customer's
 > **Record Owner**.
 
+**Visibility, supervision, authorization and ownership are four
+different things**
+
+These must not be conflated anywhere in the specification:
+
+> • **Visibility** — whether a user can see a record. Determined by the
+> reporting hierarchy in Section 2.3.
+>
+> • **Supervision** — a supervisory role's legitimate interest in work
+> below them. Carries visibility and reporting roll-up, nothing more.
+>
+> • **Authorization to act** — whether a user's fixed role permits a
+> specific action on a record they can see. Visibility alone does not
+> grant it.
+>
+> • **Operational ownership** — who is responsible for the record.
+> Restricted to Team Leads and Salespersons.
+
+A supervisory action never silently transfers ownership. When an Admin
+or Manager assigns, reassigns, replies, uploads, sends or edits within
+their permitted scope, ownership remains with the operational user, and
+the action is recorded against the person who performed it.
+
 **Deactivation / Disabling**
 
-When a User, Pipeline Stage, Product/Service, Custom Field or Module is
-deactivated or disabled:
+When a User, Pipeline Stage, Lead Priority value, catalogue entry or
+Custom Field is deactivated:
 
 > • future use is restricted as defined in the relevant section
 >
 > • existing data is retained
 >
 > • historical activity is not deleted or rewritten
+>
+> • historical records that reference the deactivated item remain
+> readable and continue to display it correctly
+
+Core application areas are not administrator-disableable. See
+Section 200.
 
 **Permissions**
 
 Users should only see records and actions they are permitted to access.
 
-Permissions must be enforced by the system, not only by hiding UI
-controls.
+Role capabilities are fixed by the application and are not configurable
+in the CRM. See Sections 2.6 and 187.
+
+Permissions must be enforced on the server for every read and every
+write, not only by hiding UI controls.
 
 **Significant Actions**
 
@@ -7792,17 +11960,23 @@ Examples include:
 >
 > • deactivating users
 >
-> • disabling modules
+> • changing a user's role
+>
+> • changing a team's Team Lead or reporting Manager
 >
 > • disconnecting WhatsApp
 >
-> • disabling Email
->
 > • changing the verified Email sender
+>
+> • marking a Customer Purchase `Closed/Active`
+>
+> • changing incentive rules
 >
 > • controlled bulk Email reminders
 >
 > • bulk messaging
+>
+> • major data import
 
 Confirmation should explain what will happen rather than displaying only
 a generic **Are you sure?**
@@ -7819,10 +11993,101 @@ For example:
 >
 > • changing reminder defaults should not alter completed reminders
 >
-> • deactivating Products/Services should not remove previous Customer
-> records
+> • deactivating a catalogue entry should not remove or invalidate
+> existing Customer Purchases
+>
+> • renaming or deactivating a Lead Priority value should not rewrite
+> the priority recorded in past activity or audit entries
 
-**178. Common UI States**
+**208. Audit History**
+
+Sensitive business actions must be recorded in an **append-only** audit
+history. Audit entries are written by the application and are never
+edited or deleted through ordinary CRM use. No user role, including
+Admin, is given an interface to alter or remove an audit entry.
+
+**Actions that must be audited**
+
+> • Lead assignment and reassignment, including automatic round-robin
+> assignment and direct assignment of a Lead created from an unknown
+> WhatsApp conversation
+>
+> • Customer ownership changes
+>
+> • Customer Purchase ownership changes
+>
+> • WhatsApp conversation assignment and reassignment
+>
+> • team membership changes
+>
+> • reporting-line changes, including moving a team to another Manager
+> or changing a team's Team Lead
+>
+> • role changes
+>
+> • user activation and deactivation
+>
+> • Lead Stage changes
+>
+> • Lead Priority changes
+>
+> • Customer Purchase status changes, including the transition to
+> `Closed/Active`
+>
+> • required policy-document upload, replacement and removal
+>
+> • Closed Amount entry and changes
+>
+> • incentive-rule and slab changes, including their effective dates
+>
+> • incentive calculations, adjustments and reversals
+>
+> • renewal status changes and reminder schedule changes
+>
+> • import execution, including the assignment strategy used
+>
+> • significant configuration changes, including catalogue,
+> Lead Priority, reminder defaults and Email sender changes
+
+**What each entry retains**
+
+As appropriate to the action:
+
+> • actor — the user who performed it
+>
+> • timestamp
+>
+> • affected record
+>
+> • action performed
+>
+> • previous value
+>
+> • new value
+>
+> • reason or note, where the action requires one
+
+Where an action was performed by a supervisory role on a subordinate
+record, the entry records the acting user. It does not record them as
+the record's owner.
+
+**Visibility**
+
+Audit history follows the fixed role model and the reporting hierarchy in
+Section 2.3. A user may review audit entries only for records within
+their permitted scope. Organization-wide audit review is not available to
+every user.
+
+Audit entries must not disclose data the viewer could not otherwise see.
+An entry concerning a peer Manager's branch or a peer Team Lead's team
+must not appear, and a previous-value or new-value field must not reveal
+an out-of-scope user, team or record.
+
+**Pending**
+
+Which roles may review which audit scopes, and audit retention periods,
+are *pending client confirmation*. See Section 212.
+**209. Common UI States**
 
 Where relevant, wireframes should account for:
 
@@ -7849,10 +12114,15 @@ Where relevant, wireframes should account for:
 These states may appear as inline messages, banners, dialogs or disabled
 controls depending on the screen.
 
-**179. Desktop and Mobile Principle**
+**210. Desktop and Mobile Principle**
 
 The **web application** is the complete CRM and administration
 experience.
+
+Salespersons and Team Leads work primarily from a phone. Admins and
+Managers work from both desktop and mobile. Every role uses the same
+application; the hierarchy and visibility rules in Section 2.3 apply
+identically on both.
 
 Mobile focuses on day-to-day operational work such as:
 
@@ -7880,9 +12150,9 @@ Mobile focuses on day-to-day operational work such as:
 >
 > • Notifications
 
-Configuration-heavy functions such as Users, Permissions, Pipeline
-configuration, Custom Fields, Import/Export and integration setup remain
-web-first.
+Configuration-heavy functions such as Users, Teams and reporting
+hierarchy, Pipeline configuration, Custom Fields, Import/Export and
+integration setup remain web-first.
 
 Mobile layouts should simplify desktop tables into mobile-friendly cards
 or lists rather than reproducing desktop layouts directly.
@@ -7891,18 +12161,20 @@ Email sender configuration, Email template administration and controlled bulk Em
 
 The same web application may also be installed on a phone or tablet home
 screen as a Progressive Web App. Installation changes how the CRM is
-launched and presented. It does not change functionality, permissions,
-data access or workspace isolation. Progressive Web App behaviour is
+launched and presented. It does not change functionality, roles,
+permissions or data access, and it does not relax the hierarchy-based
+access control defined in Section 2.3. Progressive Web App behaviour is
 defined in the following section.
 
-## 179.1 Progressive Web App Behaviour
+
+## 210.1 Progressive Web App Behaviour
 
 The CRM is delivered as a single web application that can also be
 installed on a phone or tablet home screen as a Progressive Web App.
 
 Installation changes only how the application is launched and presented.
-It does not change functionality, permissions, data access, workspace
-isolation or the V1 scope boundary.
+It does not change functionality, roles, permissions, data access or the
+hierarchy-based access control defined in Section 2.3.
 
 The application must continue to work as a normal website when it has
 not been installed. Installation is optional and must never be required
@@ -7913,7 +12185,7 @@ to use the CRM.
 - installing the CRM on a supported phone or tablet home screen
 - launching the CRM from an application icon
 - standalone display without normal browser chrome
-- application name, short name and Limenzy CRM application icons
+- the A&S Fincare application name, short name and application icons
 - light and dark theme colours matching the application themes
 - correct safe-area behaviour on devices with rounded corners, notches
   or home indicators
@@ -7943,7 +12215,7 @@ this specification. No separate installed-only screens are introduced.
 Where the application is running in standalone display mode, the
 interface may account for the absence of browser chrome, for example by
 respecting device safe areas. It must not present different navigation,
-different permissions or different functionality.
+different roles, different permissions or different functionality.
 
 **Start URL and scope**
 
@@ -7953,9 +12225,10 @@ The application start URL and scope are origin-relative:
 - scope: "/"
 
 The root route directs the user through the normal server-side
-authentication, onboarding and workspace-selection flow. The installed
-application must not start at a workspace-specific or permission-
-specific address, because no session exists at the time of installation.
+authentication flow and then to the dashboard for that user's role. The
+installed application must not start at a role-specific or
+permission-specific address, because no session exists at the time of
+installation.
 
 **Authentication in an installed application**
 
@@ -7976,14 +12249,14 @@ When the device has no connection, the CRM shows a clear branded offline
 message stating that a connection is required and offering to retry.
 
 The offline experience must not display customer data, lead data,
-renewal data, email content, reports, documents or any other workspace
+renewal data, email content, reports, documents or any other operational
 content. It must not imply that work performed offline will be saved.
 
 **Calling from an installed application**
 
 An installed PWA may initiate a normal cellular call through the native
 phone interface, using the click-to-call behaviour defined in Sections
-27.1–27.5.
+29–33.
 
 - The PWA should preserve CRM context so the salesperson can return and
   record the outcome.
@@ -8007,14 +12280,17 @@ the approved authentication and session policy.
 The following must never be retained for offline use:
 
 - authenticated application responses
-- customer, lead, renewal, product or service records
+- Lead, Customer, Customer Purchase, catalogue and renewal records
 - email content, templates or recipient data
 - documents and attachments
 - reports and report exports
-- any workspace-specific content
+- any operational content belonging to a Lead, Customer, team or user
 
 Only non-sensitive static application assets may be retained, to support
 launching the application and displaying the offline message.
+
+Cached static assets must never be used to reconstruct or infer data
+that the signed-in user is not permitted to see under Section 2.3.
 
 **Installation requirements**
 
@@ -8037,29 +12313,82 @@ able to obtain it. A user must not be left on an outdated version
 indefinitely, and an update must never be applied in a way that loses
 work in progress.
 
-**Application icons**
+**Application identity and icons**
 
-Application icons are derived from the approved Limenzy chevron symbol.
+V1 installs the CRM under the A&S Fincare product identity. The
+application name, short name, icons and offline message identify the
+application as the A&S Fincare CRM.
 
-- the original approved logo assets are preserved and must not be edited
-  or redrawn
-- the full wordmark must not be placed inside a square application icon
+- the approved A&S Fincare brand assets are used as supplied and must
+  not be edited or redrawn
+- a full wordmark must not be placed inside a square application icon
 - separate normal and maskable icons are provided
 - maskable icons respect the platform safe-zone padding so the symbol is
   not cropped on rounded or circular launcher shapes
 
-**Workspace branding**
+Final icon artwork is produced from the approved A&S Fincare brand
+assets during implementation. This specification does not define the
+visual brand.
 
-V1 installs the CRM under the Limenzy CRM product identity. The
-manifest, application icons and offline message must not contain the
-name, logo or branding of any individual business using the product.
 
-Workspace-specific installed branding is not part of V1.
+**211. V1 Scope Boundary**
 
-**180. V1 Scope Boundary**
+Wireframes and implementation should include only the V1 functionality
+defined in this specification.
 
-Wireframes should include only the V1 functionality defined in this
-specification.
+**Confirmed V1 scope**
+
+The following are committed V1 capabilities. They must not be treated as
+deferred, optional or future work:
+
+> • the four-role organizational hierarchy — Admin, Manager, Team Lead,
+> Salesperson — with teams and reporting lines (Sections 2, 185, 185.1)
+>
+> • hierarchy-scoped visibility across dashboards, records, activity,
+> reports, search, notifications and exports (Section 2.3)
+>
+> • fixed, development-defined role permissions (Sections 2.6, 187, 188)
+>
+> • Lead Priority as a field separate from Lead Stage (Section 192)
+>
+> • team-scoped round-robin Lead assignment with a per-team batch size
+> (Sections 189, 189.1)
+>
+> • the insurance product catalogue — Product Category, Provider,
+> Plan/Sub-product (Sections 66, 193)
+>
+> • Customer Purchases, including multiple purchases per Customer
+> (Sections 65, 67, 68)
+>
+> • required policy documents as a prerequisite for `Closed/Active`
+> (Sections 68.1, 68.2, 205)
+>
+> • Closed Amount recorded per Customer Purchase, with eligibility
+> gated on `Closed/Active` (Section 68.3)
+>
+> • the configurable incentive engine (Section 206)
+>
+> • automatic renewal reminders (Sections 73, 195.1)
+>
+> • the hierarchy-aware WhatsApp shared inbox, including the rule that
+> an unassigned conversation must be assigned to a Team Lead before it
+> can be answered (Sections 89.1, 93, 93.1)
+>
+> • the outbound Email module (Sections 123–140)
+>
+> • bulk-import assignment, including assignment to a Team using that
+> team's round robin (Sections 144, 152)
+>
+> • audit history for sensitive business actions (Section 208)
+
+**Details pending client confirmation**
+
+Certain values and rules inside the confirmed scope above are not yet
+settled. The capability is committed; the specific values are not. These
+are consolidated in Section 212 and must not be guessed at during
+implementation.
+
+**Explicitly excluded from V1**
 
 Do not introduce:
 
@@ -8075,7 +12404,7 @@ Do not introduce:
 >
 > • chatbot
 >
-> • multiple WhatsApp numbers per workspace
+> • multiple WhatsApp numbers
 >
 > • marketing campaign management
 >
@@ -8083,9 +12412,24 @@ Do not introduce:
 >
 > • subscription/billing management
 >
-> • custom role builders
+> • multi-tenant or multi-organization operation
 >
-> • Teams/Departments management
+> • custom role builders, editable role definitions or an
+> administrator-facing permission matrix
+>
+> • per-user permission overrides
+>
+> • administrator-configurable enabling or disabling of core modules
+>
+> • configurable visibility rules that bypass the reporting hierarchy
+>
+> • generic cross-industry product or service records
+>
+> • personal identity or KYC document management
+>
+> • document approval or review workflows
+>
+> • payroll, accounting or incentive payout processing
 >
 > • shared Email inbox
 >
@@ -8116,17 +12460,179 @@ Do not introduce:
 > • application-store distribution
 >
 > • a separate mobile application codebase
->
-> • workspace-specific installed application branding
 
-The V1 call exclusions defined in Section 27.5 also apply. In summary,
+Note that **Teams are part of V1** and are no longer excluded. What
+remains excluded is a separate Departments structure above or beside the
+team hierarchy defined in Section 2.2.
+
+The V1 call exclusions defined in Section 33 also apply. In summary,
 do not introduce in-app VoIP or WebRTC calling, telephone-number
 provisioning, call recording or transcription, automatic call-duration
 detection, automatic detection of answered, missed or failed calls,
 access to the phone's operating-system call history, automatic
 synchronization with cellular call logs, call-centre, PBX or
 telephony-provider integration, automatic outbound calling, or
-predictive or power dialling. Section 27.5 is the authoritative list.
+predictive or power dialling. Section 33 is the authoritative list.
 
-If a feature is not defined in the specification, it should not be
+**Possible future enhancements**
+
+The following are neither committed nor designed. They are recorded only
+so that V1 is not built in a way that forecloses them, and none may be
+assumed to exist:
+
+> • a Departments layer above teams
+>
+> • inbound Email handling
+>
+> • additional communication channels
+>
+> • incentive payout processing integrated with payroll
+>
+> • provider system integrations
+
+If a feature is not defined in this specification, it should not be
 assumed to exist.
+
+**212. Outstanding Decisions Pending Client Confirmation**
+
+This is the consolidated register of business decisions that remain open.
+Each is marked *pending client confirmation* where it appears elsewhere
+in the specification; this section is the single place to review them.
+
+Nothing here may be guessed at, defaulted, or implemented on assumption.
+Where a decision affects security behaviour it must be confirmed and
+approved before security implementation and UAT.
+
+**Roles and permissions**
+
+> • The final detailed action-by-action permission matrix. To be agreed
+> with A&S Fincare during development and encoded as fixed application
+> rules. See Sections 187 and 188.
+>
+> • Whether Admin and Manager may create a Lead or Customer directly,
+> and which operational user such a record must be assigned to at
+> creation.
+>
+> • Which roles may import data, and which roles may export data.
+>
+> • Which roles may export report data.
+>
+> • Which roles may initiate controlled bulk WhatsApp messaging.
+>
+> • Which roles may initiate controlled bulk Email.
+>
+> • Which roles may send individual Email and manual Email renewal
+> reminders.
+>
+> • Which roles may archive and restore Leads, Customers and Customer
+> Purchases.
+>
+> • Which roles may upload, replace or remove policy documents.
+>
+> • Which roles may attach a stored policy document to an Email.
+>
+> • Whether policy documents may be included in any bulk export, and
+> under what authorization.
+>
+> • Which roles may configure incentive rules and slabs.
+>
+> • Whether a Salesperson may reassign a Lead.
+>
+> • Whether a Salesperson may reassign a WhatsApp conversation, and to
+> whom.
+>
+> • Whether a Team Lead or Salesperson may transfer a record outside
+> their own team.
+
+**Assignment and hierarchy**
+
+> • How temporary leave, pauses and availability affect a user's
+> participation in their team's round robin.
+>
+> • The default and maximum permitted round-robin batch size.
+>
+> • Escalation behaviour when a destination team has no eligible active
+> recipient, and when an acting Admin or Manager has no eligible active
+> Team Lead available for an unknown WhatsApp conversation. What is
+> already fixed: assignment fails safely, is never given to an Admin, a
+> Manager or another team's user, an unassigned conversation stays
+> unassigned and unanswerable, and the condition is surfaced.
+>
+> • What happens to existing Leads, Customers, Customer Purchases,
+> follow-ups, renewals and conversations when a user is deactivated,
+> moved to another team, or has their role changed — beyond the already
+> fixed rule that active work must be reassigned to an active Team Lead
+> or Salesperson first and that the hierarchy must not be left invalid.
+
+**WhatsApp and Email**
+
+> • Who is operationally responsible for the unassigned WhatsApp queue,
+> and the expected response time. What is already fixed: all Admins and
+> Managers can see it, nobody can reply while a conversation is
+> unassigned, and V1 does not assign it automatically.
+>
+> • Reminder schedules, template content, escalation rules, retry timing
+> and channel precedence between WhatsApp and Email.
+
+**Customer Purchases, documents and renewals**
+
+> • Whether a distinct intermediate purchase status is required between
+> creation and `Closed/Active`.
+>
+> • The administrative level at which the required-document list is
+> defined — per Product Category, Provider, Plan or individual purchase.
+>
+> • Whether a required policy document may be removed after a purchase
+> has reached `Closed/Active`, and the effect if it is.
+>
+> • Cancellation, lapse, refund and reversal behaviour after a purchase
+> has reached `Closed/Active`.
+>
+> • Which Customer Purchases qualify for a Closed Amount.
+>
+> • Retention periods for policy documents and for audit history.
+
+**Incentives**
+
+> • Achievement slab thresholds and the number of slabs.
+>
+> • Rates, percentages and calculation formulas.
+>
+> • Eligibility conditions and eligibility dates.
+>
+> • Reporting periods and period cut-offs.
+>
+> • Which roles participate in incentives at all. Supervising a team
+> does not by itself establish that a Manager is an incentive
+> participant; this must be confirmed.
+>
+> • How Team Lead incentives treat personal production versus team
+> total.
+>
+> • Adjustments, reversals and their effect on an already-calculated
+> result.
+>
+> • Approval of calculated incentives.
+>
+> • Payment timing and payment status workflow.
+>
+> • Whether a rule change applies retrospectively.
+
+**Reporting**
+
+> • Final reporting and export access by role, where not already
+> confirmed by the hierarchy scope in Section 170.
+
+**Audit history**
+
+> • Which roles may review audit history, and over what scope. What is
+> already fixed: audit history is append-only, is never editable or
+> deletable through ordinary CRM use, follows the reporting hierarchy,
+> and must not disclose data the viewer could not otherwise see. See
+> Section 208.
+>
+> • Retention periods for audit history, and for the policy documents
+> referenced by audit entries.
+
+Where another section raises one of these questions, it should state the
+question briefly and refer here rather than repeating the full context.
