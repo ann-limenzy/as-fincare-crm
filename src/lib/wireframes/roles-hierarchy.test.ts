@@ -30,7 +30,7 @@ import {
   mayReceiveAutomaticLeads,
   mayReceiveManualAssignment,
   mayTogglePause,
-  previewAssignments,
+  previewRotation,
   rotationPool,
   teamBySlug,
   teamLeadOf,
@@ -330,9 +330,7 @@ describe("pause from round robin (§189.1)", () => {
     const everyone = new Set(activeMemberships(health).map((m) => m.userId));
     const pool = hypotheticalPool(health, everyone);
     expect(pool).toEqual([]);
-    expect(
-      previewAssignments(health.rotationOrder, pool, USER.neha, 4),
-    ).toEqual([]);
+    expect(previewRotation(pool, 1, 0, 4)).toEqual([]);
     // Nothing from another team, and no supervisor, may stand in.
     const outsiders = SETTINGS_USERS.filter(
       (u) => !activeMemberships(health).some((m) => m.userId === u.id),

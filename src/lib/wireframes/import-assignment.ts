@@ -21,6 +21,8 @@ import {
   activeMemberships,
   activeTeamOf,
   mayReceiveManualAssignment,
+  configFor,
+  configIsViable,
   rotationPool,
   userById,
   type SalesTeam,
@@ -76,13 +78,21 @@ export type TeamOption = {
    * then, and the import must fail safely rather than fall back.
    */
   readonly viable: boolean;
+  /**
+   * The destination team's one round-robin batch size (§189.1). Batch 2B
+   * surfaces this on the import screens; it is exposed here so the import
+   * flow reads the same single configuration the Team screens read, and can
+   * never pick between competing rules for one team.
+   */
+  readonly batchSize: number;
 };
 
 /**
  * The teams offered, each with the members round robin could actually reach.
  *
  * `rotationPool` is the same helper the Team screens use, so a member paused
- * there is absent here without anyone restating the rule.
+ * there is absent here without anyone restating the rule, and the batch size
+ * comes from that team's single configuration rather than a separate copy.
  */
 export const TEAM_OPTIONS: readonly TeamOption[] = SALES_TEAMS.filter(
   (t) => t.status === "Active",
@@ -93,7 +103,8 @@ export const TEAM_OPTIONS: readonly TeamOption[] = SALES_TEAMS.filter(
   paused: activeMemberships(team)
     .filter((m) => m.pausedFromRoundRobin)
     .map((m) => userById(m.userId).name),
-  viable: rotationPool(team).length > 0,
+  viable: configIsViable(team),
+  batchSize: configFor(team.id).batchSize,
 }));
 
 export type PersonOption = {

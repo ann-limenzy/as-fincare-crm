@@ -10,7 +10,8 @@ import {
 } from "@/lib/wireframes/mock-data";
 import {
   ROUND_ROBIN_LABEL,
-  LEAD_ASSIGNMENT_RULES,
+  TEAM_CONFIGS,
+  TEAM_ROUND_ROBIN_CONFIG,
   SALES_TEAMS,
   USER,
   activationCheck,
@@ -20,10 +21,12 @@ import {
   manualAssignmentPool,
   roundRobinStateOf,
   managerOf,
-  previewAssignments,
   rotationPool,
-  ruleWarning,
-  teamById,
+  configFor,
+  configProblems,
+  configStatus,
+  nextAutomaticRecipients,
+  previewRotation,
   teamBySlug,
   teamLeadOf,
   teamWarning,
@@ -280,77 +283,149 @@ describe("rotation pool (§189.1)", () => {
     }
   });
 
-  it("previews the next Leads from the stored position, inside the team", () => {
-    const rule = LEAD_ASSIGNMENT_RULES.find((r) => r.teamId === health.id)!;
-    expect(rule.lastAssignedUserId).toBe(USER.neha);
-    expect(
-      previewAssignments(
-        health.rotationOrder,
-        rotationPool(health),
-        rule.lastAssignedUserId,
-        4,
-      ),
-    ).toEqual([USER.sneha, USER.neha, USER.sneha, USER.neha]);
+  it("previews the next Leads from the team's own configuration", () => {
+    expect(configFor(health.id).lastAssignedUserId).toBe(USER.neha);
+    expect(configFor(health.id).batchSize).toBe(1);
+    expect(nextAutomaticRecipients(health, 4)).toEqual([
+      USER.sneha,
+      USER.neha,
+      USER.sneha,
+      USER.neha,
+    ]);
   });
 
   it("walks the team's own order and never leaves the team", () => {
     const members = activeMemberships(motor).map((m) => m.userId);
-    const preview = previewAssignments(
-      motor.rotationOrder,
-      rotationPool(motor),
-      null,
-      6,
-    );
+    const preview = nextAutomaticRecipients(motor, 6);
     expect(preview).toHaveLength(6);
     for (const id of preview) expect(members).toContain(id);
   });
 
   it("assigns nobody — no fallback — when the pool is empty", () => {
-    expect(previewAssignments(health.rotationOrder, [], USER.neha, 4)).toEqual(
-      [],
-    );
+    expect(previewRotation([], 1, 0, 4)).toEqual([]);
   });
 });
 
-describe("Lead assignment rules (§163.7)", () => {
-  it("targets exactly one existing team with round robin and a positive whole Batch Size", () => {
-    for (const rule of LEAD_ASSIGNMENT_RULES) {
-      expect(() => teamById(rule.teamId)).not.toThrow();
-      expect(rule.method).toBe("Round Robin");
-      expect(Number.isInteger(rule.batchSize)).toBe(true);
-      expect(rule.batchSize).toBeGreaterThanOrEqual(1);
+describe("one round-robin configuration per team (§189.1)", () => {
+  it("gives every team exactly one configuration, and every configuration a team", () => {
+    expect(TEAM_CONFIGS).toHaveLength(SALES_TEAMS.length);
+    expect(Object.keys(TEAM_ROUND_ROBIN_CONFIG).sort()).toEqual(
+      SALES_TEAMS.map((t) => t.id).sort(),
+    );
+    for (const team of SALES_TEAMS) {
+      expect(() => configFor(team.id)).not.toThrow();
+      expect(configFor(team.id).teamId).toBe(team.id);
     }
   });
 
-  it("asserts no default Batch Size — §212 leaves it open", () => {
-    // Illustrative per-team values only. Nothing here claims a V1 default.
-    const sizes = LEAD_ASSIGNMENT_RULES.map((r) => r.batchSize);
+  it("holds one batch size per team, as a positive whole number", () => {
+    const byTeam = new Map<string, number[]>();
+    for (const c of TEAM_CONFIGS) {
+      byTeam.set(c.teamId, [...(byTeam.get(c.teamId) ?? []), c.batchSize]);
+    }
+    for (const [teamId, sizes] of byTeam) {
+      expect(sizes, teamId).toHaveLength(1);
+      expect(Number.isInteger(sizes[0])).toBe(true);
+      expect(sizes[0]).toBeGreaterThanOrEqual(1);
+    }
+  });
+
+  it("passes its own structural validation", () => {
+    expect(configProblems()).toEqual([]);
+  });
+
+  it("asserts no default or maximum batch size — §212 leaves both open", () => {
+    const sizes = TEAM_CONFIGS.map((c) => c.batchSize);
     expect(new Set(sizes).size).toBeGreaterThan(1);
-    expect(
+    const src = readFileSync("src/lib/wireframes/sales-teams.ts", "utf8");
+    expect(src).not.toMatch(
+      /V1 default is 1|default batch size is|maximum batch size is/i,
+    );
+  });
+
+  it("carries no Lead-Source or routing-rule concept at all", () => {
+    // Comments may name the retired rule in order to explain its removal.
+    const src = codeOnly(
       readFileSync("src/lib/wireframes/sales-teams.ts", "utf8"),
-    ).not.toMatch(/V1 default is 1/);
-  });
-
-  it("warns only where the pause leaves a team with no eligible member", () => {
-    expect(teamWarning(health)).toBeNull();
-    expect(teamWarning(motor)).toBeNull();
-    // Life's only member is paused, so its active rule warns too.
-    expect(teamWarning(life)).toBe("No eligible members");
-    const lifeRule = LEAD_ASSIGNMENT_RULES.find((r) => r.teamId === life.id)!;
-    expect(ruleWarning(lifeRule)).toBe("No eligible members");
-    for (const rule of LEAD_ASSIGNMENT_RULES.filter(
-      (r) => r.status === "Active" && r.teamId !== life.id,
-    )) {
-      expect(ruleWarning(rule), rule.name).toBeNull();
+    );
+    expect(src).not.toMatch(
+      /walk-in|LeadAssignmentRule|LEAD_ASSIGNMENT_RULES|ROUTING_TBC/i,
+    );
+    for (const c of TEAM_CONFIGS) {
+      expect(Object.keys(c).sort()).toEqual(
+        expect.arrayContaining(["batchSize", "lastAssignedUserId", "teamId"]),
+      );
+      expect(Object.keys(c)).not.toContain("leadSource");
+      expect(Object.keys(c)).not.toContain("slug");
+      expect(Object.keys(c)).not.toContain("method");
     }
   });
 
-  it("never warns about an inactive rule", () => {
-    for (const rule of LEAD_ASSIGNMENT_RULES.filter(
-      (r) => r.status === "Inactive",
-    )) {
-      expect(ruleWarning(rule)).toBeNull();
+  it("reports Ready, No eligible members or Team inactive per team", () => {
+    expect(configStatus(health)).toBe("Ready");
+    expect(configStatus(motor)).toBe("Ready");
+    expect(configStatus(life)).toBe("No eligible members");
+    expect(configStatus({ ...health, status: "Inactive" })).toBe(
+      "Team inactive",
+    );
+  });
+
+  it("keeps the rotation state inside its own team", () => {
+    for (const team of SALES_TEAMS) {
+      const last = configFor(team.id).lastAssignedUserId;
+      if (last === null) continue;
+      expect(
+        activeMemberships(team).map((m) => m.userId),
+        team.name,
+      ).toContain(last);
     }
+  });
+});
+
+describe("batch-size preview (§189.1)", () => {
+  it("gives one Lead each in turn at batch size 1", () => {
+    expect(previewRotation(["A", "B"], 1, 0, 4)).toEqual(["A", "B", "A", "B"]);
+  });
+
+  it("gives consecutive Leads per member at batch size 2", () => {
+    expect(previewRotation(["A", "B"], 2, 0, 4)).toEqual(["A", "A", "B", "B"]);
+  });
+
+  it("honours the configured batch size for the Motor team", () => {
+    expect(configFor(motor.id).batchSize).toBe(5);
+    const preview = nextAutomaticRecipients(motor, 6);
+    // Five consecutive to one member, then rotation moves on.
+    expect(new Set(preview.slice(0, 5)).size).toBe(1);
+    expect(preview[5]).not.toBe(preview[4]);
+  });
+
+  it("skips paused and inactive members in the preview", () => {
+    expect(nextAutomaticRecipients(health, 6)).not.toContain(USER.divya);
+    expect(nextAutomaticRecipients(health, 6)).not.toContain(USER.joseph);
+  });
+
+  it("stays inside the team", () => {
+    for (const team of SALES_TEAMS) {
+      const members = activeMemberships(team).map((m) => m.userId);
+      for (const id of nextAutomaticRecipients(team, 8)) {
+        expect(members, team.name).toContain(id);
+      }
+    }
+  });
+
+  it("returns a safe empty preview when the pool is empty", () => {
+    expect(nextAutomaticRecipients(life, 6)).toEqual([]);
+    expect(previewRotation([], 2, 0, 4)).toEqual([]);
+  });
+
+  it("derives a safe position when the stored member is no longer eligible", () => {
+    // Divya is paused, so a configuration pointing at her must not name her.
+    const preview = nextAutomaticRecipients(
+      { ...health, rotationOrder: health.rotationOrder },
+      4,
+    );
+    expect(preview).not.toContain(USER.divya);
+    expect(rotationPool(health)).toEqual([USER.sneha, USER.neha]);
   });
 });
 

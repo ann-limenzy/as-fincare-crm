@@ -24,9 +24,9 @@ import { CrmChrome } from "@/components/wireframes/crm-chrome";
 import { ScreenHeading } from "@/components/wireframes/wf-ui";
 import { SETTINGS_USERS, WORKSPACE } from "@/lib/wireframes/mock-data";
 import {
-  LEAD_ASSIGNMENT_RULES,
+  SALES_TEAMS as CONFIGURED_TEAMS,
   SALES_TEAMS,
-  ruleWarning,
+  configStatus,
   teamWarning,
 } from "@/lib/wireframes/sales-teams";
 import { cn } from "@/lib/utils";
@@ -57,8 +57,10 @@ type Card = {
 
 const INVITED = SETTINGS_USERS.filter((u) => u.status === "Invited").length;
 const TEAM_WARNINGS = SALES_TEAMS.filter((t) => teamWarning(t)).length;
-const ACTIVE_RULES = LEAD_ASSIGNMENT_RULES.filter((r) => r.status === "Active");
-const RULE_WARNINGS = ACTIVE_RULES.filter((r) => ruleWarning(r)).length;
+// One automatic configuration per team, so the count IS the team count.
+const CONFIG_WARNINGS = CONFIGURED_TEAMS.filter(
+  (t) => configStatus(t) !== "Ready",
+).length;
 
 const CARDS: readonly Card[] = [
   {
@@ -100,20 +102,20 @@ const CARDS: readonly Card[] = [
   {
     id: "lead-assignment",
     href: "/wireframes/admin/lead-assignment",
-    title: "Lead assignment",
+    title: "Automatic Lead Assignment",
     icon: RouteIcon,
-    summary: `${ACTIVE_RULES.length} active rules · round robin`,
+    summary: `${CONFIGURED_TEAMS.length} teams · one configuration each`,
     detail:
-      "Rules that give new Leads a Record Owner by rotating through one Team's eligible members.",
+      "Each team's single round-robin configuration: the batch size, and the members currently in or paused from round robin.",
     items: [
-      "Assignment rules",
-      "Target team",
-      "Batch Size",
-      "Rotation pool preview",
+      "Team",
+      "Round-robin batch size",
+      "In round robin",
+      "Paused from round robin",
     ],
-    status: RULE_WARNINGS
+    status: CONFIG_WARNINGS
       ? {
-          label: `${RULE_WARNINGS} ${RULE_WARNINGS === 1 ? "rule has a warning" : "rules have warnings"}`,
+          label: `${CONFIG_WARNINGS} ${CONFIG_WARNINGS === 1 ? "team needs" : "teams need"} attention`,
           tone: "warn",
         }
       : undefined,

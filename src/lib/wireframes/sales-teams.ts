@@ -63,13 +63,6 @@ export const RESUME_ACTION = "Resume round robin participation";
 export const PAUSE_EFFECT_NOTE =
   "A paused member is skipped by automatic Lead assignment. They stay an active user, keep every record they already hold, and may still be given a Lead by an authorized manual assignment.";
 
-/**
- * Decision 1 in §163.18 is open, so no screen names a routing condition.
- * One sentence, shared, so every screen says the same thing.
- */
-export const ROUTING_TBC =
-  "How incoming Leads select this rule will be confirmed with A&S Fincare.";
-
 /** Presentation date for every "today" on these screens. */
 export const TEAMS_TODAY = "11 Sep 2026";
 
@@ -139,24 +132,36 @@ export type SalesTeam = {
   detailHref?: "/wireframes/admin/teams/health-insurance";
 };
 
-export type LeadAssignmentRule = {
-  id: string;
-  slug: string;
-  name: string;
-  status: "Active" | "Inactive";
-  /** Exactly one Team (§163.7). */
+/**
+ * A team's one automatic Lead-assignment configuration (§189.1).
+ *
+ * There is exactly one of these per team. It is not a "rule" that competes
+ * with other rules: §189.1 selects a destination team first, and then that
+ * team's single configuration decides which eligible member receives the
+ * Lead. Every approved automatic path into a team — manual Lead creation,
+ * bulk import, an authorized reassignment — uses this same configuration.
+ *
+ * Lead Source deliberately plays no part. §190 makes Lead Source
+ * configurable business data and a reporting dimension, and states that
+ * configuring it changes no ownership or authorization, so there is no
+ * source-specific batch size and no source-keyed routing engine.
+ */
+export type TeamRoundRobinConfig = {
   teamId: string;
-  /** Fixed. §163.7 offers no other automatic method. */
-  method: "Round Robin";
   /**
    * Positive whole number.
    *
-   * PENDING CLIENT CONFIRMATION (§212): the default and maximum permitted
-   * batch size are open decisions. The values below are illustrative for
-   * each team and assert no default.
+   * PENDING CLIENT CONFIRMATION (§212): the default and the maximum
+   * permitted batch size are open decisions. The values below are
+   * illustrative per team and assert neither.
    */
   batchSize: number;
-  /** The member the stored rotation position points past (§163.8). */
+  /**
+   * The member the stored rotation position points past (§189.1).
+   *
+   * Only ever read through `nextAutomaticRecipients`, which derives a safe
+   * position when this member has since been paused, deactivated or moved.
+   */
   lastAssignedUserId: string | null;
   updated: string;
   updatedByUserId: string;
@@ -330,57 +335,47 @@ export const SALES_TEAMS: readonly SalesTeam[] = [
   },
 ];
 
-export const LEAD_ASSIGNMENT_RULES: readonly LeadAssignmentRule[] = [
-  {
-    id: "rule-health",
-    slug: "health-insurance",
-    name: "Health Insurance Lead Assignment",
-    status: "Active",
+/**
+ * Keyed by team id, so a second configuration for the same team cannot be
+ * written down: TypeScript rejects a duplicate key in this object literal.
+ * That makes the one-per-team rule structural rather than a check someone
+ * has to remember to run.
+ *
+ * The retired "Motor Walk-in" rule is deliberately absent. It was a second
+ * configuration for the Motor team, keyed on a Lead Source and carrying its
+ * own batch size, which §190 does not permit.
+ */
+export const TEAM_ROUND_ROBIN_CONFIG: Readonly<
+  Record<string, TeamRoundRobinConfig>
+> = {
+  "team-health": {
     teamId: "team-health",
-    method: "Round Robin",
     batchSize: 1,
     lastAssignedUserId: USER.neha,
     updated: "02 Sep 2026",
     updatedByUserId: USER.arun,
     detailHref: "/wireframes/admin/lead-assignment/health-insurance",
   },
-  {
-    id: "rule-motor",
-    slug: "motor-insurance",
-    name: "Motor Insurance Lead Assignment",
-    status: "Active",
+  "team-motor": {
     teamId: "team-motor",
-    method: "Round Robin",
     batchSize: 5,
     lastAssignedUserId: USER.ajay,
     updated: "28 Aug 2026",
     updatedByUserId: USER.arun,
   },
-  {
-    id: "rule-life",
-    slug: "life-investments",
-    name: "Life & Investments Lead Assignment",
-    status: "Active",
+  "team-life": {
     teamId: "team-life",
-    method: "Round Robin",
     batchSize: 1,
     lastAssignedUserId: USER.nisha,
     updated: "15 Jul 2026",
     updatedByUserId: USER.arun,
   },
-  {
-    id: "rule-motor-walk-in",
-    slug: "motor-walk-in",
-    name: "Motor Walk-in Lead Assignment",
-    status: "Inactive",
-    teamId: "team-motor",
-    method: "Round Robin",
-    batchSize: 1,
-    lastAssignedUserId: USER.ajay,
-    updated: "20 Aug 2026",
-    updatedByUserId: USER.arun,
-  },
-];
+};
+
+/** Every configuration, in the same order as SALES_TEAMS. */
+export const TEAM_CONFIGS: readonly TeamRoundRobinConfig[] = SALES_TEAMS.map(
+  (t) => TEAM_ROUND_ROBIN_CONFIG[t.id]!,
+);
 
 /* ---------------------------------------------------------------- lookups */
 
@@ -410,10 +405,11 @@ export function teamBySlug(slug: string): SalesTeam {
   return team;
 }
 
-export function ruleBySlug(slug: string): LeadAssignmentRule {
-  const rule = LEAD_ASSIGNMENT_RULES.find((r) => r.slug === slug);
-  if (!rule) throw new Error(`Unknown wireframe rule: ${slug}`);
-  return rule;
+/** The one configuration for a team. Throws rather than inventing a default. */
+export function configFor(teamId: string): TeamRoundRobinConfig {
+  const config = TEAM_ROUND_ROBIN_CONFIG[teamId];
+  if (!config) throw new Error(`No round-robin configuration: ${teamId}`);
+  return config;
 }
 
 export function activeMemberships(team: SalesTeam): readonly Membership[] {
@@ -427,10 +423,6 @@ export function teamLeadOf(team: SalesTeam): Membership | undefined {
 /** The Manager a team reports to through its Team Lead (§2.2). */
 export function managerOf(team: SalesTeam): SettingsUser {
   return userById(team.managerId);
-}
-
-export function rulesTargeting(teamId: string): readonly LeadAssignmentRule[] {
-  return LEAD_ASSIGNMENT_RULES.filter((r) => r.teamId === teamId);
 }
 
 /** The one active team a user belongs to, if any (§163.2). */
@@ -546,31 +538,110 @@ export function manualAssignmentPool(team: SalesTeam): readonly string[] {
 }
 
 /**
- * Who the next `count` automatic Leads would go to, for a Batch Size of 1.
+ * Who the next `count` automatically assigned Leads would go to.
  *
- * Starts from the member after the stored position and walks the team's own
- * order, skipping anyone outside the pool. Pausing someone never moves the
- * stored position, and restoring someone gives them no priority: they are
- * reached only when the walk comes to their place in the order.
+ * Reads the destination team's one configuration, so the batch size and the
+ * pool can never disagree with what the screens show. Batch size N gives the
+ * same eligible member N consecutive Leads before rotating.
  *
- * Returns an empty list when the pool is empty — the caller shows Assignment
- * Required. There is no fallback.
+ * The stored `lastAssignedUserId` is only a hint. If that member has since
+ * been paused, deactivated or moved to another team, the walk starts from
+ * the next eligible member after their old place in the rotation order
+ * rather than naming an ineligible recipient.
  */
-export function previewAssignments(
-  order: readonly string[],
-  pool: readonly string[],
-  lastAssignedUserId: string | null,
+export function nextAutomaticRecipients(
+  team: SalesTeam,
   count: number,
 ): readonly string[] {
-  if (pool.length === 0 || order.length === 0) return [];
+  const pool = rotationPool(team);
+  if (pool.length === 0 || count <= 0) return [];
+  const { batchSize, lastAssignedUserId } = configFor(team.id);
+  const size = Number.isInteger(batchSize) && batchSize > 0 ? batchSize : 1;
+
+  // Start after the stored position, walking the team's own stable order and
+  // skipping anyone no longer eligible.
+  const order = team.rotationOrder;
   const inPool = new Set(pool);
-  const start = lastAssignedUserId ? order.indexOf(lastAssignedUserId) : -1;
+  const from =
+    lastAssignedUserId !== null ? order.indexOf(lastAssignedUserId) : -1;
+  let idx = 0;
+  for (let step = 1; step <= order.length; step += 1) {
+    const candidate = order[(from + step + order.length) % order.length];
+    if (candidate && inPool.has(candidate)) {
+      idx = pool.indexOf(candidate);
+      break;
+    }
+  }
+
+  return previewRotation(pool, size, idx, count);
+}
+
+/**
+ * The pure rotation walk: `batchSize` consecutive Leads per pool member.
+ *
+ * Shared so an interactive control can preview a candidate batch size
+ * without reaching past `nextAutomaticRecipients`, which is the only path
+ * that reads a team's stored configuration.
+ */
+export function previewRotation(
+  pool: readonly string[],
+  batchSize: number,
+  startIndex: number,
+  count: number,
+): readonly string[] {
+  if (pool.length === 0 || count <= 0) return [];
+  const size = Number.isInteger(batchSize) && batchSize > 0 ? batchSize : 1;
   const out: string[] = [];
-  let i = start;
+  let idx = ((startIndex % pool.length) + pool.length) % pool.length;
+  let taken = 0;
   while (out.length < count) {
-    i = (i + 1) % order.length;
-    const candidate = order[i]!;
-    if (inPool.has(candidate)) out.push(candidate);
+    out.push(pool[idx]!);
+    taken += 1;
+    if (taken === size) {
+      taken = 0;
+      idx = (idx + 1) % pool.length;
+    }
+  }
+  return out;
+}
+
+/** True when this configuration is usable for automatic assignment. */
+export function configIsViable(team: SalesTeam): boolean {
+  return configStatus(team) === "Ready";
+}
+
+/**
+ * Structural checks on the configuration set, for the tests to assert.
+ *
+ * Duplicate team ids are already impossible (the store is keyed by team id
+ * and TypeScript rejects a repeated key), so this covers the rest.
+ */
+export function configProblems(): readonly string[] {
+  const out: string[] = [];
+  for (const team of SALES_TEAMS) {
+    const config = TEAM_ROUND_ROBIN_CONFIG[team.id];
+    if (!config) {
+      out.push(`${team.name} has no round-robin configuration`);
+      continue;
+    }
+    if (config.teamId !== team.id) {
+      out.push(`${team.name} configuration names another team`);
+    }
+    if (!Number.isInteger(config.batchSize) || config.batchSize < 1) {
+      out.push(`${team.name} batch size must be a positive whole number`);
+    }
+    const last = config.lastAssignedUserId;
+    if (last !== null) {
+      const members = activeMemberships(team).map((m) => m.userId);
+      if (!members.includes(last)) {
+        out.push(`${team.name} rotation state names a non-member`);
+      }
+    }
+  }
+  for (const id of Object.keys(TEAM_ROUND_ROBIN_CONFIG)) {
+    if (!SALES_TEAMS.some((t) => t.id === id)) {
+      out.push(`configuration ${id} has no team`);
+    }
   }
   return out;
 }
@@ -600,9 +671,13 @@ export function teamWarning(team: SalesTeam): string | null {
   return null;
 }
 
-export function ruleWarning(rule: LeadAssignmentRule): string | null {
-  if (rule.status !== "Active") return null;
-  return teamWarning(teamById(rule.teamId));
+/** Configuration status shown on the Automatic Lead Assignment screens. */
+export type ConfigStatus = "Ready" | "No eligible members" | "Team inactive";
+
+export function configStatus(team: SalesTeam): ConfigStatus {
+  if (team.status !== "Active") return "Team inactive";
+  if (rotationPool(team).length === 0) return "No eligible members";
+  return "Ready";
 }
 
 /**

@@ -38,7 +38,7 @@ import {
   addCandidates,
   initialsOf,
   managerOf,
-  rulesTargeting,
+  configFor,
   teamCounts,
   teamLeadOf,
   teamWarning,
@@ -168,7 +168,7 @@ export function SalesTeamsScreen() {
                     scope="col"
                     className="px-3 py-2.5 text-right font-medium"
                   >
-                    Active rules
+                    Batch size
                   </th>
                   <th scope="col" className="px-4 py-2.5 font-medium">
                     Assignment warning
@@ -181,9 +181,9 @@ export function SalesTeamsScreen() {
                   const leadUser = lead ? userById(lead.userId) : null;
                   const c = teamCounts(team);
                   const warning = teamWarning(team);
-                  const activeRules = rulesTargeting(team.id).filter(
-                    (r) => r.status === "Active",
-                  ).length;
+                  // One configuration per team, so this is a batch size,
+                  // never a count of competing rules.
+                  const batchSize = configFor(team.id).batchSize;
                   return (
                     <tr
                       key={team.id}
@@ -257,7 +257,7 @@ export function SalesTeamsScreen() {
                       <Num value={c.active} />
                       <Num value={c.eligible} emphasise={c.eligible === 0} />
                       <Num value={c.paused} />
-                      <Num value={activeRules} />
+                      <Num value={batchSize} />
                       <td className="px-4 py-3">
                         {warning ? (
                           <span className="flex min-h-11 flex-col justify-center gap-1">

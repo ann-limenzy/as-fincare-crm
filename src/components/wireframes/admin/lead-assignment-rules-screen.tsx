@@ -1,651 +1,253 @@
 "use client";
 
-import {
-  Info,
-  Plus,
-  Route as RouteIcon,
-  ShieldCheck,
-  UsersRound,
-} from "lucide-react";
+import { Info, ShieldCheck, UsersRound } from "lucide-react";
 import Link from "next/link";
-import { useId, useState, type ReactNode } from "react";
 
 import { CrmChrome } from "@/components/wireframes/crm-chrome";
 import {
   Breadcrumbs,
-  ConceptDialog,
-  Consequences,
-  NothingSaved,
   StatusChip,
+  TeamLeadBadge,
   WarningChip,
   buttonClass,
 } from "@/components/wireframes/teams/team-parts";
 import {
+  Avatar,
   Note,
   Panel,
   ScreenHeading,
-  TableScroll,
 } from "@/components/wireframes/wf-ui";
 import {
-  LEAD_ASSIGNMENT_RULES,
-  ROUTING_TBC,
   SALES_TEAMS,
+  activeMemberships,
+  configFor,
+  configStatus,
+  initialsOf,
+  managerOf,
+  nextAutomaticRecipients,
   rotationPool,
-  ruleWarning,
-  teamById,
-  teamWarning,
+  teamLeadOf,
   userById,
-  type LeadAssignmentRule,
 } from "@/lib/wireframes/sales-teams";
 import { cn } from "@/lib/utils";
 
 /**
- * T3 — Lead Assignment rules (Settings → Lead Assignment, spec §163.7).
+ * T3 — Automatic Lead Assignment (Settings → Lead Assignment, spec §189.1).
  *
- * Every rule sends new Leads to exactly ONE Team, by round robin. That
- * is the whole of the method list: there is no "all salespeople", no
- * workload routing, and nothing here assigns Customers, Follow-ups,
- * Renewals or conversations.
+ * One configuration per team, and no way to create a second. §189.1 selects
+ * a destination team first; that team's single configuration then decides
+ * which eligible member receives the Lead. Every approved automatic path
+ * into a team — manual Lead creation, bulk import, an authorized
+ * reassignment — shares this one batch size, pool and rotation position.
  *
- * How an incoming Lead selects a rule is decision 1 in §163.18, so the
- * screen names that as open rather than implying Product/Service routing.
+ * There is deliberately no rule list, no Add Rule action and no Lead-Source
+ * routing: §190 makes Lead Source reporting data, not an assignment input.
  */
 
-type Filter = "all" | "active" | "inactive" | "warning";
+const PREVIEW_LENGTH = 6;
 
-const FILTERS: readonly { id: Filter; label: string }[] = [
-  { id: "all", label: "All" },
-  { id: "active", label: "Active" },
-  { id: "inactive", label: "Inactive" },
-  { id: "warning", label: "Warning" },
-];
-
-export function LeadAssignmentRulesScreen() {
-  const [filter, setFilter] = useState<Filter>("all");
-  const [inactive, setInactive] = useState<readonly string[]>([]);
-  const [creating, setCreating] = useState(false);
-  const [deactivating, setDeactivating] = useState<LeadAssignmentRule | null>(
-    null,
-  );
-
-  const statusOf = (rule: LeadAssignmentRule) =>
-    inactive.includes(rule.id) ? "Inactive" : rule.status;
-  const warningOf = (rule: LeadAssignmentRule) =>
-    statusOf(rule) === "Active" ? ruleWarning(rule) : null;
-
-  const matches = (rule: LeadAssignmentRule, f: Filter) =>
-    f === "all" ||
-    (f === "active" && statusOf(rule) === "Active") ||
-    (f === "inactive" && statusOf(rule) === "Inactive") ||
-    (f === "warning" && warningOf(rule) !== null);
-
-  const visible = LEAD_ASSIGNMENT_RULES.filter((r) => matches(r, filter));
-
+export function AutomaticLeadAssignmentScreen() {
   return (
     <CrmChrome active="settings">
       <div className="flex min-w-0 flex-col gap-5">
         <Breadcrumbs
           items={[
             { label: "Settings", href: "/wireframes/admin/settings" },
-            { label: "Lead Assignment" },
+            { label: "Automatic Lead Assignment" },
           ]}
         />
 
         <ScreenHeading
-          title="Lead Assignment"
-          description="Rules that give new Leads a Record Owner automatically. Each rule targets one Team and rotates only among that team's eligible members."
+          title="Automatic Lead Assignment"
+          description="Each team has one round-robin configuration. Once a destination team is chosen, that configuration decides which eligible member receives the Lead."
           actions={
-            <>
-              <Link
-                href="/wireframes/admin/teams"
-                className={buttonClass("outline")}
-              >
-                <UsersRound className="size-4" aria-hidden="true" />
-                Teams
-              </Link>
-              <button
-                type="button"
-                onClick={() => setCreating(true)}
-                aria-haspopup="dialog"
-                className={buttonClass("primary")}
-              >
-                <Plus className="size-4" aria-hidden="true" />
-                Create rule
-              </button>
-            </>
+            <Link
+              href="/wireframes/admin/teams"
+              className={buttonClass("outline")}
+            >
+              <UsersRound className="size-4" aria-hidden="true" />
+              Teams
+            </Link>
           }
         />
 
-        <div
-          role="group"
-          aria-label="Filter rules"
-          className="flex flex-wrap gap-2"
+        <Note icon={Info}>
+          <strong className="font-semibold">One configuration per team.</strong>{" "}
+          Choosing the destination team and distributing within it are separate
+          steps. A team cannot have two batch sizes, two pools or two rotation
+          positions, so there is nothing to add and nothing to choose between.
+        </Note>
+
+        <Panel
+          title="Teams"
+          icon={UsersRound}
+          count={SALES_TEAMS.length}
+          bodyClassName="flex flex-col gap-3 p-4 sm:p-5"
         >
-          {FILTERS.map((f) => {
-            const count = LEAD_ASSIGNMENT_RULES.filter((r) =>
-              matches(r, f.id),
-            ).length;
+          {SALES_TEAMS.map((team) => {
+            const config = configFor(team.id);
+            const status = configStatus(team);
+            const pool = rotationPool(team);
+            const paused = activeMemberships(team).filter(
+              (m) => m.pausedFromRoundRobin,
+            );
+            const lead = teamLeadOf(team);
+            const leadUser = lead ? userById(lead.userId) : null;
+            const preview = nextAutomaticRecipients(team, PREVIEW_LENGTH);
             return (
-              <button
-                key={f.id}
-                type="button"
-                aria-pressed={filter === f.id}
-                onClick={() => setFilter(f.id)}
-                className={cn(
-                  "inline-flex min-h-11 items-center gap-2 rounded-full border px-4 text-sm font-medium transition-colors",
-                  filter === f.id
-                    ? "border-primary/40 bg-primary/12 text-primary"
-                    : "border-border bg-surface text-muted-foreground hover:text-foreground",
-                )}
+              <article
+                key={team.id}
+                aria-label={team.name}
+                className="surface-solid flex flex-col gap-3 rounded-xl p-4"
               >
-                {f.label}
-                <span
-                  className={cn(
-                    "rounded-full px-1.5 text-xs font-semibold",
-                    filter === f.id
-                      ? "bg-primary/15 text-primary"
-                      : "bg-muted text-muted-foreground",
+                <div className="flex flex-wrap items-start justify-between gap-3">
+                  <div className="min-w-0">
+                    <h3 className="text-sm font-semibold text-foreground">
+                      {team.name}
+                    </h3>
+                    <p className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-muted-foreground">
+                      {leadUser ? (
+                        <span className="flex items-center gap-1.5">
+                          <Avatar
+                            initials={initialsOf(leadUser.name)}
+                            size="sm"
+                          />
+                          {leadUser.name}
+                          <TeamLeadBadge className="px-2 text-[10px]" />
+                        </span>
+                      ) : (
+                        <span>No active Team Lead</span>
+                      )}
+                      <span>
+                        Reports to {managerOf(team).name} (
+                        {managerOf(team).role})
+                      </span>
+                    </p>
+                  </div>
+                  <div className="flex flex-wrap items-center gap-2">
+                    <StatusChip status={team.status} />
+                    {status === "Ready" ? (
+                      <span className="inline-flex w-fit items-center rounded-full border border-success/30 bg-success-subtle px-2.5 py-0.5 text-xs font-medium whitespace-nowrap text-success-on-subtle">
+                        Ready
+                      </span>
+                    ) : (
+                      <WarningChip>{status}</WarningChip>
+                    )}
+                    {team.detailHref ? (
+                      <Link
+                        href="/wireframes/admin/lead-assignment/health-insurance"
+                        className={buttonClass("outline", "px-3")}
+                      >
+                        Edit
+                      </Link>
+                    ) : (
+                      <span className="text-[11px] text-muted-foreground">
+                        Edit page not in this walkthrough
+                      </span>
+                    )}
+                  </div>
+                </div>
+
+                <dl className="grid gap-3 sm:grid-cols-3">
+                  <Fact label="Round-robin batch size">
+                    <span className="tabular-nums">{config.batchSize}</span>{" "}
+                    <span className="text-xs text-muted-foreground">
+                      {config.batchSize === 1
+                        ? "Lead each, in turn"
+                        : "consecutive Leads each"}
+                    </span>
+                  </Fact>
+                  <Fact label="In round robin">
+                    {pool.length === 0 ? (
+                      <span className="text-muted-foreground">None</span>
+                    ) : (
+                      pool.map((id) => userById(id).name).join(", ")
+                    )}
+                  </Fact>
+                  <Fact label="Paused from round robin">
+                    {paused.length === 0 ? (
+                      <span className="text-muted-foreground">None</span>
+                    ) : (
+                      paused.map((m) => userById(m.userId).name).join(", ")
+                    )}
+                  </Fact>
+                </dl>
+
+                <div>
+                  <p className="text-[11px] font-medium tracking-wide text-muted-foreground uppercase">
+                    Next automatic Leads
+                  </p>
+                  {preview.length === 0 ? (
+                    <p className="mt-1 text-xs leading-relaxed text-danger-on-subtle">
+                      No eligible members, so automatic assignment waits. New
+                      Leads for this team stay unassigned against it. Nothing
+                      falls back to another team, an Admin or a Manager.
+                    </p>
+                  ) : (
+                    <ol className="mt-1 flex flex-wrap items-center gap-1.5">
+                      {preview.map((id, i) => (
+                        <li
+                          key={`${id}-${i}`}
+                          className="flex items-center gap-1.5"
+                        >
+                          <span
+                            className={cn(
+                              "rounded-full border border-border bg-muted px-2 py-0.5 text-xs text-foreground",
+                            )}
+                          >
+                            {userById(id).name.split(" ")[0]}
+                          </span>
+                          {i < preview.length - 1 ? (
+                            <span
+                              aria-hidden="true"
+                              className="text-muted-foreground"
+                            >
+                              →
+                            </span>
+                          ) : null}
+                        </li>
+                      ))}
+                    </ol>
                   )}
-                >
-                  {count}
-                </span>
-              </button>
+                </div>
+
+                {paused.length > 0 ? (
+                  <p className="text-xs leading-relaxed text-muted-foreground">
+                    {paused.map((m) => userById(m.userId).name).join(", ")}{" "}
+                    {paused.length === 1 ? "is" : "are"} skipped by automatic
+                    assignment while paused, and may still be given a Lead by an
+                    authorized manual assignment.
+                  </p>
+                ) : null}
+              </article>
             );
           })}
-        </div>
-
-        <p role="status" aria-live="polite" className="sr-only">
-          Showing {visible.length} rules
-        </p>
-
-        <Panel title="Rules" icon={RouteIcon} count={visible.length}>
-          <TableScroll>
-            <table className="w-full min-w-[68rem] text-sm">
-              <thead>
-                <tr className="border-b border-border text-left text-xs text-muted-foreground">
-                  <th scope="col" className="px-4 py-2.5 font-medium">
-                    Rule
-                  </th>
-                  <th scope="col" className="px-4 py-2.5 font-medium">
-                    Status
-                  </th>
-                  <th scope="col" className="px-4 py-2.5 font-medium">
-                    Target Team
-                  </th>
-                  <th scope="col" className="px-4 py-2.5 font-medium">
-                    Method
-                  </th>
-                  <th
-                    scope="col"
-                    className="px-3 py-2.5 text-right font-medium"
-                  >
-                    Batch Size
-                  </th>
-                  <th
-                    scope="col"
-                    className="px-3 py-2.5 text-right font-medium"
-                  >
-                    Eligible pool
-                  </th>
-                  <th scope="col" className="px-4 py-2.5 font-medium">
-                    Assignment warning
-                  </th>
-                  <th scope="col" className="px-4 py-2.5 font-medium">
-                    Last updated
-                  </th>
-                  <th scope="col" className="px-4 py-2.5 font-medium">
-                    <span className="sr-only">Actions</span>
-                  </th>
-                </tr>
-              </thead>
-              <tbody>
-                {visible.map((rule) => {
-                  const team = teamById(rule.teamId);
-                  const status = statusOf(rule);
-                  const warning = warningOf(rule);
-                  const pool = rotationPool(team).length;
-                  return (
-                    <tr
-                      key={rule.id}
-                      className="border-b border-border/70 align-top last:border-0"
-                    >
-                      <td className="px-4 py-3">
-                        {rule.detailHref ? (
-                          <Link
-                            href={rule.detailHref}
-                            className="inline-flex min-h-11 items-center font-semibold text-primary underline-offset-4 hover:underline"
-                          >
-                            {rule.name}
-                          </Link>
-                        ) : (
-                          <span className="flex min-h-11 items-center font-semibold text-foreground">
-                            {rule.name}
-                          </span>
-                        )}
-                        {rule.detailHref ? null : (
-                          <span className="block text-[11px] text-muted-foreground/80">
-                            Rule page not included in this walkthrough
-                          </span>
-                        )}
-                      </td>
-                      <td className="px-4 py-3">
-                        <span className="flex min-h-11 items-center">
-                          <StatusChip status={status} />
-                        </span>
-                      </td>
-                      <td className="px-4 py-3">
-                        {team.detailHref ? (
-                          <Link
-                            href={team.detailHref}
-                            className="inline-flex min-h-11 items-center text-foreground underline-offset-4 hover:underline"
-                          >
-                            {team.name}
-                          </Link>
-                        ) : (
-                          <span className="flex min-h-11 items-center text-foreground">
-                            {team.name}
-                          </span>
-                        )}
-                      </td>
-                      <td className="px-4 py-3">
-                        <span className="flex min-h-11 items-center text-foreground">
-                          {rule.method}
-                        </span>
-                      </td>
-                      <td className="px-3 py-3 text-right tabular-nums">
-                        <span className="flex min-h-11 items-center justify-end">
-                          {rule.batchSize}
-                        </span>
-                      </td>
-                      <td className="px-3 py-3 text-right tabular-nums">
-                        <span
-                          className={cn(
-                            "flex min-h-11 items-center justify-end",
-                            pool === 0 && "font-semibold text-danger-on-subtle",
-                          )}
-                        >
-                          {pool}
-                        </span>
-                      </td>
-                      <td className="px-4 py-3">
-                        {warning ? (
-                          <span className="flex min-h-11 flex-col justify-center gap-1">
-                            <WarningChip>{warning}</WarningChip>
-                            {team.assignmentRequired > 0 ? (
-                              <span className="text-xs text-danger-on-subtle">
-                                {team.assignmentRequired} Leads in Assignment
-                                Required
-                              </span>
-                            ) : null}
-                          </span>
-                        ) : (
-                          <span className="flex min-h-11 items-center text-xs text-muted-foreground">
-                            None
-                          </span>
-                        )}
-                      </td>
-                      <td className="px-4 py-3 whitespace-nowrap text-muted-foreground">
-                        <span className="flex min-h-11 flex-col justify-center">
-                          {rule.updated}
-                          <span className="text-xs">
-                            {userById(rule.updatedByUserId).name}
-                          </span>
-                        </span>
-                      </td>
-                      <td className="px-4 py-3">
-                        {status === "Active" ? (
-                          <button
-                            type="button"
-                            onClick={() => setDeactivating(rule)}
-                            aria-haspopup="dialog"
-                            aria-label={`Deactivate ${rule.name}`}
-                            className={buttonClass("ghost", "px-3")}
-                          >
-                            Deactivate
-                          </button>
-                        ) : (
-                          <span className="flex min-h-11 items-center text-xs text-muted-foreground">
-                            History kept
-                          </span>
-                        )}
-                      </td>
-                    </tr>
-                  );
-                })}
-                {visible.length === 0 ? (
-                  <tr>
-                    <td
-                      colSpan={9}
-                      className="px-4 py-8 text-center text-sm text-muted-foreground"
-                    >
-                      No rules match this filter.
-                    </td>
-                  </tr>
-                ) : null}
-              </tbody>
-            </table>
-          </TableScroll>
         </Panel>
 
-        <div className="grid gap-4 lg:grid-cols-3">
-          <Note icon={Info}>
-            <strong className="font-semibold">Routing condition.</strong>{" "}
-            {ROUTING_TBC}
-          </Note>
-          <Note icon={ShieldCheck}>
-            <strong className="font-semibold">Never outside the team.</strong>{" "}
-            If a rule&apos;s team has no eligible member, the Lead is kept in
-            Assignment Required — never given to another team or the whole
-            workspace.
-          </Note>
-          <Note icon={RouteIcon} tone="neutral">
-            <strong className="font-semibold">Leads only.</strong> Customers,
-            Follow-ups, Renewals and WhatsApp conversations keep their own
-            assignment and are never part of a rule.
-          </Note>
-        </div>
+        <Note icon={ShieldCheck}>
+          Changing a batch size updates that team&apos;s existing configuration.
+          It affects future automatic assignments only, and never rewrites who
+          already owns a Lead. Configuring assignment is not a permission: it
+          changes no role&apos;s visibility or authorization.
+        </Note>
       </div>
-
-      <CreateRuleDialog open={creating} onClose={() => setCreating(false)} />
-
-      {deactivating ? (
-        <DeactivateRuleDialog
-          rule={deactivating}
-          onClose={() => setDeactivating(null)}
-          onConfirm={() => setInactive((prev) => [...prev, deactivating.id])}
-        />
-      ) : null}
     </CrmChrome>
   );
 }
 
-/* ------------------------------------------------------------- create rule */
-
-function CreateRuleDialog({
-  open,
-  onClose,
-}: {
-  open: boolean;
-  onClose: () => void;
-}) {
-  const ids = useId();
-  const [name, setName] = useState("");
-  const [teamId, setTeamId] = useState("");
-  const [batch, setBatch] = useState("1");
-  const [attempted, setAttempted] = useState(false);
-  const [done, setDone] = useState(false);
-
-  const batchValid = /^\d+$/.test(batch.trim()) && Number(batch) >= 1;
-  const errors = {
-    name: name.trim() ? null : "Enter a rule name.",
-    team: teamId ? null : "Choose the one Team this rule assigns to.",
-    batch: batchValid
-      ? null
-      : "Batch Size must be a whole number of 1 or more.",
-  };
-  const valid = !errors.name && !errors.team && !errors.batch;
-  const team = teamId ? teamById(teamId) : null;
-  const teamWarn = team ? teamWarning(team) : null;
-
-  const close = () => {
-    onClose();
-    setName("");
-    setTeamId("");
-    setBatch("1");
-    setAttempted(false);
-    setDone(false);
-  };
-
-  if (done && team) {
-    return (
-      <ConceptDialog
-        open={open}
-        onClose={close}
-        title="Rule created — concept"
-        footer={
-          <button
-            type="button"
-            onClick={close}
-            className={buttonClass("primary")}
-          >
-            Back to Lead Assignment
-          </button>
-        }
-      >
-        <div className="flex flex-col gap-3">
-          <p className="text-sm text-foreground">
-            <strong className="font-semibold">{name.trim()}</strong> would
-            assign new Leads by round robin to {team.name}, Batch Size{" "}
-            {Number(batch)}.
-          </p>
-          <Consequences
-            items={[
-              "Applies to future Leads only. Existing Lead ownership is unchanged.",
-              ROUTING_TBC,
-            ]}
-          />
-          <NothingSaved />
-        </div>
-      </ConceptDialog>
-    );
-  }
-
-  return (
-    <ConceptDialog
-      open={open}
-      onClose={close}
-      title="Create Lead assignment rule"
-      description="A rule assigns new Leads to the eligible members of exactly one Team."
-      footer={
-        <>
-          <button
-            type="button"
-            onClick={close}
-            className={buttonClass("outline")}
-          >
-            Cancel
-          </button>
-          <button
-            type="button"
-            onClick={() => {
-              setAttempted(true);
-              if (valid) setDone(true);
-            }}
-            className={buttonClass("primary")}
-          >
-            Create rule
-          </button>
-        </>
-      }
-    >
-      <div className="flex flex-col gap-4">
-        <Field
-          id={`${ids}-name`}
-          label="Rule name"
-          error={attempted ? errors.name : null}
-        >
-          <input
-            id={`${ids}-name`}
-            value={name}
-            onChange={(e) => setName(e.target.value)}
-            aria-invalid={attempted && !!errors.name}
-            className="h-11 w-full rounded-lg border border-input bg-surface px-3 text-sm text-foreground"
-          />
-        </Field>
-
-        <Field
-          id={`${ids}-team`}
-          label="Target Team — exactly one"
-          error={attempted ? errors.team : null}
-          hint={teamWarn ? `Assignment warning: ${teamWarn}.` : undefined}
-        >
-          <select
-            id={`${ids}-team`}
-            value={teamId}
-            onChange={(e) => setTeamId(e.target.value)}
-            aria-invalid={attempted && !!errors.team}
-            className="h-11 w-full rounded-lg border border-input bg-surface px-3 text-sm text-foreground"
-          >
-            <option value="">Choose a team…</option>
-            {SALES_TEAMS.filter((t) => t.status === "Active").map((t) => (
-              <option key={t.id} value={t.id}>
-                {t.name}
-              </option>
-            ))}
-          </select>
-        </Field>
-
-        <div>
-          <p className="mb-1 block text-xs font-medium text-muted-foreground">
-            Assignment method
-          </p>
-          <p className="flex h-11 items-center rounded-lg border border-border bg-muted px-3 text-sm font-medium text-foreground">
-            Round Robin
-          </p>
-          <p className="mt-1 text-xs text-muted-foreground">
-            The only automatic method. It rotates within the chosen team.
-          </p>
-        </div>
-
-        <Field
-          id={`${ids}-batch`}
-          label="Batch Size"
-          error={attempted ? errors.batch : null}
-          hint="How many consecutive Leads one member receives before the rotation moves on. Default 1."
-        >
-          <input
-            id={`${ids}-batch`}
-            type="number"
-            inputMode="numeric"
-            min={1}
-            step={1}
-            value={batch}
-            onChange={(e) => setBatch(e.target.value)}
-            aria-invalid={attempted && !!errors.batch}
-            className="h-11 w-32 rounded-lg border border-input bg-surface px-3 text-sm text-foreground tabular-nums"
-          />
-        </Field>
-
-        <div>
-          <p className="mb-1 block text-xs font-medium text-muted-foreground">
-            Which Leads use this rule
-          </p>
-          <p className="rounded-lg border border-dashed border-border px-3 py-2.5 text-sm text-muted-foreground">
-            Routing condition to be agreed. {ROUTING_TBC}
-          </p>
-        </div>
-      </div>
-    </ConceptDialog>
-  );
-}
-
-function Field({
-  id,
+function Fact({
   label,
-  error,
-  hint,
   children,
 }: {
-  id: string;
   label: string;
-  error: string | null;
-  hint?: string;
-  children: ReactNode;
+  children: React.ReactNode;
 }) {
   return (
-    <div>
-      <label
-        htmlFor={id}
-        className="mb-1 block text-xs font-medium text-muted-foreground"
-      >
+    <div className="min-w-0">
+      <dt className="text-[11px] font-medium tracking-wide text-muted-foreground uppercase">
         {label}
-      </label>
-      {children}
-      {hint ? (
-        <p className="mt-1 text-xs text-muted-foreground">{hint}</p>
-      ) : null}
-      {error ? (
-        <p className="mt-1 text-xs text-danger-on-subtle">{error}</p>
-      ) : null}
+      </dt>
+      <dd className="mt-0.5 text-sm text-foreground">{children}</dd>
     </div>
-  );
-}
-
-/* --------------------------------------------------------- deactivate rule */
-
-function DeactivateRuleDialog({
-  rule,
-  onClose,
-  onConfirm,
-}: {
-  rule: LeadAssignmentRule;
-  onClose: () => void;
-  onConfirm: () => void;
-}) {
-  const [done, setDone] = useState(false);
-  const team = teamById(rule.teamId);
-
-  if (done) {
-    return (
-      <ConceptDialog
-        open
-        onClose={onClose}
-        title="Rule deactivated — concept"
-        footer={
-          <button
-            type="button"
-            onClick={onClose}
-            className={buttonClass("primary")}
-          >
-            Back to Lead Assignment
-          </button>
-        }
-      >
-        <div className="flex flex-col gap-3">
-          <p className="text-sm text-foreground">
-            {rule.name} is now shown as Inactive.
-          </p>
-          <NothingSaved />
-        </div>
-      </ConceptDialog>
-    );
-  }
-
-  return (
-    <ConceptDialog
-      open
-      onClose={onClose}
-      title={`Deactivate ${rule.name}?`}
-      footer={
-        <>
-          <button
-            type="button"
-            onClick={onClose}
-            className={buttonClass("outline")}
-          >
-            Cancel
-          </button>
-          <button
-            type="button"
-            onClick={() => {
-              onConfirm();
-              setDone(true);
-            }}
-            className={buttonClass("danger")}
-          >
-            Deactivate rule
-          </button>
-        </>
-      }
-    >
-      <Consequences
-        items={[
-          "No new Lead is assigned through this rule from now on.",
-          "Existing Leads keep their current Record Owners.",
-          `${team.name} and its members are unchanged.`,
-          "The rule's audit history is preserved.",
-        ]}
-      />
-    </ConceptDialog>
   );
 }

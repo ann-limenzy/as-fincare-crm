@@ -22,7 +22,6 @@ import {
   RoundRobinChip,
   NothingSaved,
   RoleChip,
-  StatusChip,
   TeamLeadBadge,
   WarningChip,
   buttonClass,
@@ -34,14 +33,15 @@ import {
   ScreenHeading,
 } from "@/components/wireframes/wf-ui";
 import {
-  ROUTING_TBC,
   activeMemberships,
   hypotheticalPool,
   pausedUserIdsOf,
   initialsOf,
-  previewAssignments,
-  ruleBySlug,
-  teamById,
+  configFor,
+  configStatus,
+  managerOf,
+  previewRotation,
+  teamBySlug,
   teamLeadOf,
   userById,
 } from "@/lib/wireframes/sales-teams";
@@ -56,14 +56,15 @@ import { cn } from "@/lib/utils";
  * shrink to nothing and see Assignment Required take over, then restore a
  * member and see that nobody is compensated.
  *
- * Batch Size stays at the default 1. Nothing here simulates what §163.18
- * leaves open: manual assignment and the rotation, a Batch Size maximum,
- * where a new member joins the order, or a reactivated team's position.
+ * The batch-size control and the pause toggles are demonstration controls:
+ * they move this preview and nothing else. Nothing here simulates what §212
+ * still leaves open — the default and maximum batch size, or where a newly
+ * added member joins the rotation order.
  */
 
-const RULE = ruleBySlug("health-insurance");
-const TEAM = teamById(RULE.teamId);
-const PREVIEW_LENGTH = 4;
+const TEAM = teamBySlug("health-insurance");
+const CONFIG = configFor(TEAM.id);
+const PREVIEW_LENGTH = 6;
 
 type LastChange = { name: string; to: "Paused" | "Eligible" } | null;
 
@@ -72,19 +73,21 @@ export function LeadAssignmentRuleScreen() {
     pausedUserIdsOf(TEAM),
   );
   const [lastChange, setLastChange] = useState<LastChange>(null);
+  const [batchSize, setBatchSize] = useState(CONFIG.batchSize);
 
-  // The preview honours the demonstration toggles; the saved data is what
-  // `rotationPool(TEAM)` would return.
+  // The preview honours the demonstration controls; the saved configuration
+  // is what `nextAutomaticRecipients(TEAM, n)` would return.
   const pool = hypotheticalPool(TEAM, pausedIds);
-  const preview = previewAssignments(
-    TEAM.rotationOrder,
-    pool,
-    RULE.lastAssignedUserId,
-    PREVIEW_LENGTH,
+  const startIndex = Math.max(
+    0,
+    pool.indexOf(
+      pool.find((id) => id !== CONFIG.lastAssignedUserId) ?? pool[0] ?? "",
+    ),
   );
+  const preview = previewRotation(pool, batchSize, startIndex, PREVIEW_LENGTH);
   const lead = teamLeadOf(TEAM);
-  const lastAssigned = RULE.lastAssignedUserId
-    ? userById(RULE.lastAssignedUserId)
+  const lastAssigned = CONFIG.lastAssignedUserId
+    ? userById(CONFIG.lastAssignedUserId)
     : null;
   const empty = pool.length === 0;
   const saved = pausedUserIdsOf(TEAM);
@@ -125,13 +128,13 @@ export function LeadAssignmentRuleScreen() {
               label: "Lead Assignment",
               href: "/wireframes/admin/lead-assignment",
             },
-            { label: RULE.name },
+            { label: `Automatic Lead Assignment — ${TEAM.name}` },
           ]}
         />
 
         <ScreenHeading
-          title={RULE.name}
-          description="Assigns each new Lead that uses this rule to the next eligible member of one Team."
+          title={`Automatic Lead Assignment — ${TEAM.name}`}
+          description="This team's one round-robin configuration. Whenever an approved flow selects this team, the batch size and pool below decide which eligible member receives the Lead."
           actions={
             TEAM.detailHref ? (
               <Link href={TEAM.detailHref} className={buttonClass("outline")}>
@@ -142,9 +145,9 @@ export function LeadAssignmentRuleScreen() {
           }
         />
 
-        <Panel title="Rule" icon={RouteIcon}>
+        <Panel title="Configuration" icon={RouteIcon}>
           <dl className="grid gap-x-6 gap-y-4 px-4 py-4 sm:grid-cols-2 sm:px-5 xl:grid-cols-4">
-            <Item label="Target Team">
+            <Item label="Team">
               {TEAM.detailHref ? (
                 <Link
                   href={TEAM.detailHref}
@@ -156,37 +159,68 @@ export function LeadAssignmentRuleScreen() {
                 TEAM.name
               )}
               <span className="block text-xs text-muted-foreground">
-                Exactly one team per rule
+                One configuration per team
               </span>
             </Item>
-            <Item label="Assignment method">
-              <span className="font-semibold">Round Robin</span>
+            <Item label="Reporting Manager">
+              <span className="font-semibold">{managerOf(TEAM).name}</span>
               <span className="block text-xs text-muted-foreground">
-                Fixed — the only automatic method
+                {managerOf(TEAM).role} · supervises without being a member
               </span>
             </Item>
-            <Item label="Batch Size">
-              <span className="font-semibold tabular-nums">
-                {RULE.batchSize}
-              </span>
-              <span className="block text-xs text-muted-foreground">
-                Positive whole number · default 1 · one Lead per member at a
-                time
-              </span>
-            </Item>
-            <Item label="Status">
-              <StatusChip status={RULE.status} />
+            <Item label="Round-robin batch size">
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  aria-label="Decrease round-robin batch size"
+                  disabled={batchSize <= 1}
+                  onClick={() => setBatchSize((n) => Math.max(1, n - 1))}
+                  className={buttonClass("outline", "size-11 px-0")}
+                >
+                  −
+                </button>
+                <output
+                  aria-live="polite"
+                  className="min-w-10 text-center text-base font-semibold text-foreground tabular-nums"
+                >
+                  {batchSize}
+                </output>
+                <button
+                  type="button"
+                  aria-label="Increase round-robin batch size"
+                  onClick={() => setBatchSize((n) => n + 1)}
+                  className={buttonClass("outline", "size-11 px-0")}
+                >
+                  +
+                </button>
+              </div>
               <span className="mt-1 block text-xs text-muted-foreground">
-                Updated {RULE.updated} by {userById(RULE.updatedByUserId).name}
+                Positive whole number.{" "}
+                {batchSize === 1
+                  ? "One Lead each, in turn."
+                  : `${batchSize} consecutive Leads each before rotating.`}
+              </span>
+            </Item>
+            <Item label="Configuration status">
+              {configStatus(TEAM) === "Ready" ? (
+                <span className="inline-flex w-fit items-center rounded-full border border-success/30 bg-success-subtle px-2.5 py-0.5 text-xs font-medium text-success-on-subtle">
+                  Ready
+                </span>
+              ) : (
+                <WarningChip>{configStatus(TEAM)}</WarningChip>
+              )}
+              <span className="mt-1 block text-xs text-muted-foreground">
+                Updated {CONFIG.updated} by{" "}
+                {userById(CONFIG.updatedByUserId).name}
               </span>
             </Item>
             <div className="sm:col-span-2 xl:col-span-4">
-              <dt className="text-xs font-medium text-muted-foreground">
-                Which Leads use this rule
-              </dt>
-              <dd className="mt-1 rounded-lg border border-dashed border-border px-3 py-2 text-sm text-muted-foreground">
-                Routing condition to be agreed. {ROUTING_TBC}
-              </dd>
+              <p className="rounded-lg border border-dashed border-border px-3 py-2 text-xs leading-relaxed text-muted-foreground">
+                The default and maximum permitted batch size are still to be
+                confirmed with A&amp;S Fincare, so the value above is
+                illustrative. Changing it affects future automatic assignments
+                only and never rewrites who already owns a Lead.
+              </p>
             </div>
           </dl>
         </Panel>
@@ -425,13 +459,11 @@ function AssignmentRequiredPanel({ leadName }: { leadName: string | null }) {
             <dd>
               <WarningChip>Assignment Required</WarningChip>
             </dd>
-            <dt className="text-muted-foreground">Rule and team</dt>
-            <dd className="text-foreground">
-              {RULE.name} · {TEAM.name}
-            </dd>
+            <dt className="text-muted-foreground">Destination team</dt>
+            <dd className="text-foreground">{TEAM.name}</dd>
             <dt className="text-muted-foreground">Reason recorded</dt>
             <dd className="text-foreground">
-              No eligible member in the target team
+              No eligible member in the destination team
             </dd>
           </dl>
         </div>

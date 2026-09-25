@@ -345,7 +345,7 @@ export const FLOWS: readonly Flow[] = [
     name: "Teams and Lead Assignment",
     icon: "UsersRound",
     description:
-      "Who shares new Leads: teams that each rotate Leads among their own eligible members, the rules that send Leads to one team, and a Team Lead pausing members from a phone.",
+      "Who shares new Leads: teams that each rotate Leads among their own eligible members, the one automatic configuration each team has, and a Team Lead pausing members from a phone.",
     device: "both",
     steps: [
       {
@@ -366,16 +366,16 @@ export const FLOWS: readonly Flow[] = [
       },
       {
         href: "/wireframes/admin/lead-assignment",
-        label: "Assignment rules",
-        title: "Lead assignment rules",
+        label: "Automatic assignment",
+        title: "Automatic Lead Assignment",
         summary:
-          "Each rule sends new Leads to exactly one team, by round robin. Nothing else is assigned this way.",
+          "One round-robin configuration per team. Nothing else is assigned this way.",
         device: "desktop",
       },
       {
         href: "/wireframes/admin/lead-assignment/health-insurance",
-        label: "Rule and pool",
-        title: "Round-robin rule and pool preview",
+        label: "Batch size and pool",
+        title: "Batch size and pool preview",
         summary:
           "Who gets the next Lead, and what happens when nobody in the team is eligible.",
         device: "desktop",

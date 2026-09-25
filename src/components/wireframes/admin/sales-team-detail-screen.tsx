@@ -50,7 +50,7 @@ import {
   initialsOf,
   managerOf,
   mayReceiveAutomaticLeads,
-  rulesTargeting,
+  configFor,
   teamBySlug,
   teamLeadOf,
   userById,
@@ -104,7 +104,7 @@ export function SalesTeamDetailScreen() {
     : eligible.length === 0
       ? "No eligible members"
       : null;
-  const rules = rulesTargeting(TEAM.id);
+  const config = configFor(TEAM.id);
   const ended = TEAM.memberships.filter((m) => m.status === "Ended");
 
   const close = () => setDialog(null);
@@ -348,41 +348,33 @@ export function SalesTeamDetailScreen() {
         </Panel>
 
         <div className="grid gap-4 lg:grid-cols-2">
-          <Panel
-            title="Lead assignment rules targeting this team"
-            icon={RouteIcon}
-            count={rules.length}
-          >
-            <ul className="divide-y divide-border">
-              {rules.map((rule) => (
-                <li
-                  key={rule.id}
-                  className="flex flex-wrap items-center gap-3 px-4 py-3 sm:px-5"
+          <Panel title="Automatic Lead Assignment" icon={RouteIcon}>
+            <div className="flex flex-col gap-2 px-4 py-3 sm:px-5">
+              <p className="text-sm text-foreground">
+                Round-robin batch size{" "}
+                <strong className="font-semibold tabular-nums">
+                  {config.batchSize}
+                </strong>
+                <span className="text-xs text-muted-foreground">
+                  {" "}
+                  · one configuration for this team
+                </span>
+              </p>
+              <p className="text-xs leading-relaxed text-muted-foreground">
+                Every approved automatic path into {TEAM.name} uses this same
+                batch size, pool and rotation position. There is no second
+                configuration and no Lead-Source variant.
+              </p>
+              {warning ? <WarningChip>{warning}</WarningChip> : null}
+              {config.detailHref ? (
+                <Link
+                  href={config.detailHref}
+                  className="inline-flex min-h-11 w-fit items-center font-semibold text-primary underline-offset-4 hover:underline"
                 >
-                  <span className="min-w-0 flex-1">
-                    {rule.detailHref ? (
-                      <Link
-                        href={rule.detailHref}
-                        className="inline-flex min-h-11 items-center font-semibold text-primary underline-offset-4 hover:underline"
-                      >
-                        {rule.name}
-                      </Link>
-                    ) : (
-                      <span className="font-semibold text-foreground">
-                        {rule.name}
-                      </span>
-                    )}
-                    <span className="block text-xs text-muted-foreground">
-                      {rule.method} · Batch Size {rule.batchSize}
-                    </span>
-                  </span>
-                  <StatusChip status={rule.status} />
-                  {warning && rule.status === "Active" ? (
-                    <WarningChip>{warning}</WarningChip>
-                  ) : null}
-                </li>
-              ))}
-            </ul>
+                  Edit configuration
+                </Link>
+              ) : null}
+            </div>
           </Panel>
 
           <Panel title="History" icon={History}>
