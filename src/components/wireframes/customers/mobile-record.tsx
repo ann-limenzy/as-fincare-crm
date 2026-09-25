@@ -60,7 +60,7 @@ import { cn } from "@/lib/utils";
  * conversation offers, so moving between the two never relearns a toolbar.
  *
  * Two roles are deliberately shown separately and must not be collapsed:
- * Arun Menon OWNS the record, Sneha Thomas holds the WHATSAPP CONVERSATION.
+ * Neha Thomas OWNS the record, Sneha Thomas holds the WHATSAPP CONVERSATION.
  * Sneha is signed in. Opening or replying to a conversation does not transfer
  * ownership, and a wireframe that quietly showed "Owner: Sneha" would teach
  * the client the opposite of how the permission model works.

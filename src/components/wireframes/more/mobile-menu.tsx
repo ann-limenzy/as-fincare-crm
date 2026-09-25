@@ -40,7 +40,7 @@ import {
  * modules this role can actually reach, with the work waiting in each one.
  *
  * "Permitted" is doing real work here. Reports is present but closed, because
- * §162 gives Staff/Sales "View Reports: No" — that is a role boundary, not a
+ * §162 gives a Salesperson "View Reports: No" — that is a role boundary, not a
  * missing wireframe, and the row says so rather than hiding it and pretending
  * the module does not exist. Admin settings, user management and import are
  * absent entirely: §162 denies Staff all three, so offering them even greyed
@@ -188,8 +188,7 @@ export function MobileMoreScreen() {
               <p className="px-1 pt-1 pb-1 text-[11px] leading-relaxed text-muted-foreground">
                 What appears here depends on your role. Workspace settings,
                 users and imports are administrator tools and are not part of a
-                Sales Executive&apos;s app. My Team is here because you lead a
-                Sales Team.
+                Salesperson&apos;s app. My Team is here because you lead a Team.
               </p>
             </div>
           </PhoneScreen>

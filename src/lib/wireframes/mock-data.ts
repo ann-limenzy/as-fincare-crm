@@ -33,42 +33,72 @@ export const CURRENT_USER = {
 /**
  * Who the MOBILE wireframes are presented as.
  *
- * The phone screens demonstrate a salesperson's day, and the actions they are
- * allowed to take differ from an administrator's — assignment in particular
- * (spec §162). Keeping this separate from `CURRENT_USER` means the mobile
- * screens can show the sales role without the admin wireframes inheriting it.
+ * The phone screens demonstrate an operational user's day, and the actions
+ * they are allowed to take differ from an administrator's — assignment in
+ * particular (spec §162). Keeping this separate from `CURRENT_USER` means the
+ * mobile screens can show an operational role without the admin wireframes
+ * inheriting it.
+ *
+ * Sneha leads the Health Insurance Team, and §2.4 lets a Team Lead own and
+ * personally work Leads, so the same phone screens still show real fieldwork.
  */
 export const SALES_PERSONA = {
   name: "Sneha Thomas",
   firstName: "Sneha",
-  role: "Sales Executive",
+  role: "Team Lead",
   initials: "ST",
 } as const;
 
 /* ------------------------------------------------------------------ people */
 
+/**
+ * The four fixed application roles (spec §2.1).
+ *
+ * The CRM provides no custom role creation and no editable role
+ * capabilities, so this union is the whole role model. "Owner" and "Staff"
+ * are not roles — `Record Owner` is only the name of a record relationship.
+ */
+export type AppRole = "Admin" | "Manager" | "Team Lead" | "Salesperson";
+
+/** Admin and Manager supervise; Team Lead and Salesperson do the work (§2.4). */
+export const OPERATIONAL_ROLES = ["Team Lead", "Salesperson"] as const;
+
+/**
+ * Whether a role may hold a Record Owner or operational Assigned To seat.
+ *
+ * §2.5: only Team Leads and Salespersons may; Admins and Managers must never
+ * be selectable as operational owners or assignees.
+ */
+export function isOperationalRole(role: AppRole): boolean {
+  return (OPERATIONAL_ROLES as readonly AppRole[]).includes(role);
+}
+
 export type Owner = {
   id: string;
   name: string;
   initials: string;
-  role: "Owner" | "Admin" | "Manager" | "Staff";
+  role: AppRole;
 };
 
-/** Active workspace users who can be assigned work. */
+/**
+ * Active users who can be assigned work.
+ *
+ * Operational roles only. Arun Menon (Admin) and Vikram Shah (Manager) are
+ * deliberately absent: §2.5 forbids a supervisor from ever being offered as
+ * an operational owner or assignee, in pickers as much as anywhere else.
+ */
 export const TEAM: readonly Owner[] = [
-  { id: "u1", name: "Arun Menon", initials: "AM", role: "Admin" },
-  { id: "u2", name: "Sneha Thomas", initials: "ST", role: "Staff" },
-  { id: "u3", name: "Vikram Shah", initials: "VS", role: "Manager" },
-  { id: "u4", name: "Neha Thomas", initials: "NT", role: "Staff" },
+  { id: "u2", name: "Sneha Thomas", initials: "ST", role: "Team Lead" },
+  { id: "u4", name: "Neha Thomas", initials: "NT", role: "Salesperson" },
   // Fathima Rasheed (invited, not yet active) is deliberately absent: an
   // invited user cannot be given work. The Customer of the same name is a
   // different person and lives in DIRECTORY_CUSTOMERS.
-  // Active salespeople added with the Sales Teams wireframes (see
-  // SETTINGS_USERS). Only ever offered as options in assignee pickers.
-  { id: "u6", name: "Divya Mohan", initials: "DM", role: "Staff" },
-  { id: "u7", name: "Ajay Varma", initials: "AV", role: "Staff" },
-  { id: "u8", name: "Nisha George", initials: "NG", role: "Staff" },
-  { id: "u9", name: "Kavya Raghavan", initials: "KR", role: "Staff" },
+  // Active salespeople added with the Teams wireframes (see SETTINGS_USERS).
+  // Only ever offered as options in assignee pickers.
+  { id: "u6", name: "Divya Mohan", initials: "DM", role: "Salesperson" },
+  { id: "u7", name: "Ajay Varma", initials: "AV", role: "Team Lead" },
+  { id: "u8", name: "Nisha George", initials: "NG", role: "Team Lead" },
+  { id: "u9", name: "Kavya Raghavan", initials: "KR", role: "Salesperson" },
 ];
 
 /* --------------------------------------------------------- Flow A: import */
@@ -522,7 +552,7 @@ export const CONVERSATIONS: readonly Conversation[] = [
     product: "Motor Insurance",
     lastMessage: "Can you share the quote again?",
     time: "Yesterday",
-    assignedTo: "Arun Menon",
+    assignedTo: "Kavya Raghavan",
     status: "Open",
     unread: 0,
     delivery: "read",
@@ -537,7 +567,7 @@ export const CONVERSATIONS: readonly Conversation[] = [
     product: "Motor Insurance",
     lastMessage: "Renewal completed. Thanks for your help.",
     time: "09 Sep",
-    assignedTo: "Vikram Shah",
+    assignedTo: "Ajay Varma",
     status: "Closed",
     unread: 0,
     delivery: "read",
@@ -836,8 +866,9 @@ export const FOLLOW_UP_TYPES: readonly string[] = [
  *
  * Two roles are deliberately different and must stay that way (spec §87):
  * the CONVERSATION is assigned to Sneha Thomas, while the customer RECORD is
- * still owned by Arun Menon. Reassigning a conversation does not change the
- * record owner.
+ * still owned by Neha Thomas. Reassigning a conversation does not change the
+ * record owner. Both are operational users in the same team, as §2.5
+ * requires — a supervisor could hold neither seat.
  */
 export const CUSTOMER_RECORD = {
   name: "Ramesh Kumar",
@@ -851,7 +882,7 @@ export const CUSTOMER_RECORD = {
   email: "ramesh.kumar@mail.example",
   preferredChannel: "WhatsApp",
   /** Record owner — NOT the conversation assignee, NOT the permitted user. */
-  owner: "Arun Menon",
+  owner: "Neha Thomas",
   /**
    * Salespeople the record has been explicitly shared with.
    *
@@ -890,7 +921,7 @@ export const CUSTOMER_UPCOMING: readonly UpcomingAction[] = [
     date: "26 Sep 2026",
     kind: "Renewal",
     detail: "Health Insurance renewal falls due",
-    assignedTo: "Arun Menon",
+    assignedTo: "Neha Thomas",
   },
 ];
 
@@ -1279,15 +1310,16 @@ export type MobileFollowUp = {
 /**
  * Sneha Thomas's follow-up workload.
  *
- * VISIBILITY: spec §43 says "Staff users should primarily see follow-ups
- * assigned to them unless broader permissions are granted", and §162 gives
- * Staff/Sales no right to view all Leads/Customers. So every item here is
+ * VISIBILITY: spec §43 says operational users should primarily see follow-ups
+ * assigned to them unless broader permissions are granted, and §2.3 gives a
+ * Salesperson no right to view all Leads/Customers. So every item here is
  * assigned to Sneha — the list is not filtered down from a wider set, because
  * a wider set is not hers to hold.
  *
  * Note that assignment of a follow-up is its own fact. Anitha Desai's WhatsApp
- * conversation belongs to Arun Menon and she is absent here; Ramesh's record is
- * owned by Arun yet his follow-up is Sneha's. Neither implies the other.
+ * conversation belongs to Kavya Raghavan and she is absent here; Ramesh's
+ * record is owned by Neha yet his follow-up is Sneha's. Neither implies the
+ * other.
  *
  * Identities agree with the rest of the presentation: references, phones and
  * products match CONVERSATIONS, LEAD_RECORD and DIRECTORY_CUSTOMERS, and the
@@ -1465,8 +1497,8 @@ export type PermittedRecord = {
  * rather than inferred from anything else.
  *
  * Anitha Desai (Lead · #2044) is deliberately absent. Her WhatsApp
- * conversation is assigned to Arun Menon, and a conversation assignment is
- * not record access — the same rule the customer directory follows.
+ * conversation is assigned to Kavya Raghavan, and a conversation assignment
+ * is not record access — the same rule the customer directory follows.
  */
 export const SALES_LEADS: readonly PermittedRecord[] = [
   {
@@ -2041,7 +2073,7 @@ export const TODAY_FOLLOW_UPS: readonly FollowUpRow[] = [
     person: "Priya Iyer",
     product: "Health Insurance",
     type: "Call",
-    assignedTo: "Arun Menon",
+    assignedTo: "Sneha Thomas",
     status: "Due",
   },
   {
@@ -2059,7 +2091,7 @@ export const TODAY_FOLLOW_UPS: readonly FollowUpRow[] = [
     person: "Sneha Nair",
     product: "PUC Certificate",
     type: "WhatsApp",
-    assignedTo: "Arun Menon",
+    assignedTo: "Divya Mohan",
     status: "Due",
   },
   {
@@ -2068,7 +2100,7 @@ export const TODAY_FOLLOW_UPS: readonly FollowUpRow[] = [
     person: "Rajesh Menon",
     product: "Health Insurance",
     type: "Call",
-    assignedTo: "Vikram Shah",
+    assignedTo: "Sneha Thomas",
     status: "Scheduled",
   },
   {
@@ -2086,7 +2118,7 @@ export const TODAY_FOLLOW_UPS: readonly FollowUpRow[] = [
     person: "Neha Pillai",
     product: "Health Insurance",
     type: "Email",
-    assignedTo: "Arun Menon",
+    assignedTo: "Divya Mohan",
     status: "Overdue",
   },
 ];
@@ -2247,23 +2279,11 @@ export type WorkloadRow = {
 const OPEN_WORK: Readonly<
   Record<string, Omit<WorkloadRow, "id" | "user" | "initials">>
 > = {
-  "Arun Menon": {
-    assignedLeads: 14,
-    followUpsToday: 4,
-    overdue: 1,
-    renewals: 7,
-  },
   "Sneha Thomas": {
     assignedLeads: 11,
     followUpsToday: 3,
     overdue: 0,
     renewals: 5,
-  },
-  "Vikram Shah": {
-    assignedLeads: 9,
-    followUpsToday: 2,
-    overdue: 2,
-    renewals: 6,
   },
   "Neha Thomas": {
     assignedLeads: 7,
@@ -2279,8 +2299,12 @@ export type SettingsUser = {
   id: string;
   name: string;
   email: string;
-  role: "Owner" | "Admin" | "Manager" | "Staff";
+  role: AppRole;
   status: "Active" | "Invited" | "Deactivated";
+  /**
+   * Operational records this user owns. Always 0 for Admin and Manager:
+   * §2.5 forbids a supervisor from being a Record Owner at all.
+   */
   assignedRecords: number;
   lastActive: string;
 };
@@ -2290,9 +2314,9 @@ export const SETTINGS_USERS: readonly SettingsUser[] = [
     id: "s1",
     name: "Arun Menon",
     email: "arun@asfincare.example",
-    role: "Owner",
+    role: "Admin",
     status: "Active",
-    assignedRecords: 142,
+    assignedRecords: 0,
     lastActive: "Today, 10:04 AM",
   },
   {
@@ -2301,14 +2325,14 @@ export const SETTINGS_USERS: readonly SettingsUser[] = [
     email: "vikram@asfincare.example",
     role: "Manager",
     status: "Active",
-    assignedRecords: 96,
+    assignedRecords: 0,
     lastActive: "Today, 9:12 AM",
   },
   {
     id: "s3",
     name: "Sneha Thomas",
     email: "sneha@asfincare.example",
-    role: "Staff",
+    role: "Team Lead",
     status: "Active",
     assignedRecords: 74,
     lastActive: "Today, 8:47 AM",
@@ -2317,7 +2341,7 @@ export const SETTINGS_USERS: readonly SettingsUser[] = [
     id: "s4",
     name: "Neha Thomas",
     email: "neha@asfincare.example",
-    role: "Staff",
+    role: "Salesperson",
     status: "Active",
     assignedRecords: 61,
     lastActive: "Yesterday",
@@ -2326,7 +2350,7 @@ export const SETTINGS_USERS: readonly SettingsUser[] = [
     id: "s5",
     name: "Fathima Rasheed",
     email: "fathima@asfincare.example",
-    role: "Staff",
+    role: "Salesperson",
     status: "Invited",
     assignedRecords: 0,
     lastActive: "Invitation sent 09 Sep",
@@ -2335,7 +2359,7 @@ export const SETTINGS_USERS: readonly SettingsUser[] = [
     id: "s6",
     name: "Joseph Kurian",
     email: "joseph@asfincare.example",
-    role: "Staff",
+    role: "Salesperson",
     status: "Deactivated",
     assignedRecords: 38,
     lastActive: "14 Aug 2026",
@@ -2351,7 +2375,7 @@ export const SETTINGS_USERS: readonly SettingsUser[] = [
     id: "s7",
     name: "Divya Mohan",
     email: "divya@asfincare.example",
-    role: "Staff",
+    role: "Salesperson",
     status: "Active",
     assignedRecords: 29,
     lastActive: "Today, 9:26 AM",
@@ -2360,7 +2384,7 @@ export const SETTINGS_USERS: readonly SettingsUser[] = [
     id: "s8",
     name: "Ajay Varma",
     email: "ajay@asfincare.example",
-    role: "Staff",
+    role: "Team Lead",
     status: "Active",
     assignedRecords: 47,
     lastActive: "Today, 8:58 AM",
@@ -2369,7 +2393,7 @@ export const SETTINGS_USERS: readonly SettingsUser[] = [
     id: "s9",
     name: "Nisha George",
     email: "nisha@asfincare.example",
-    role: "Staff",
+    role: "Team Lead",
     status: "Active",
     assignedRecords: 22,
     lastActive: "07 Sep",
@@ -2378,7 +2402,7 @@ export const SETTINGS_USERS: readonly SettingsUser[] = [
     id: "s10",
     name: "Kavya Raghavan",
     email: "kavya@asfincare.example",
-    role: "Staff",
+    role: "Salesperson",
     status: "Active",
     assignedRecords: 0,
     lastActive: "Today, 8:15 AM",
@@ -2386,12 +2410,15 @@ export const SETTINGS_USERS: readonly SettingsUser[] = [
 ];
 
 /**
- * The admin dashboard's Team workload: every ACTIVE workspace user who can
- * hold work, derived from SETTINGS_USERS so a new active user can never be
- * silently left out. Ordered by assigned Leads, most first.
+ * The admin dashboard's Team workload: every ACTIVE user who can hold work,
+ * derived from SETTINGS_USERS so a new active user can never be silently
+ * left out. Ordered by assigned Leads, most first.
+ *
+ * Admins and Managers are excluded by role, not by name: §2.5 means a
+ * supervisor holds no operational work, so they have no row to show.
  */
 export const TEAM_WORKLOAD: readonly WorkloadRow[] = SETTINGS_USERS.filter(
-  (u) => u.status === "Active",
+  (u) => u.status === "Active" && isOperationalRole(u.role),
 )
   .map((u) => ({
     id: `wl-${u.id}`,

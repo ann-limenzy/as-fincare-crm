@@ -12,7 +12,7 @@
  * over from an earlier session comes back with nothing selected.
  *
  * Teams and people are read from `sales-teams.ts` rather than typed again, so
- * the import screen can never show a roster the Sales Team wireframes
+ * the import screen can never show a roster the Team wireframes
  * contradict during the same presentation.
  */
 
@@ -20,6 +20,7 @@ import {
   SALES_TEAMS,
   activeMemberships,
   activeTeamOf,
+  mayReceiveManualAssignment,
   rotationPool,
   userById,
   type SalesTeam,
@@ -66,15 +67,22 @@ export const DEFAULT_CHOICE: AssignmentChoice = {
 export type TeamOption = {
   readonly id: string;
   readonly name: string;
-  /** Names in this team's rotation order, eligible ones only. */
+  /** Names in this team's rotation order that automatic assignment reaches. */
   readonly eligible: readonly string[];
+  /** Active members skipped because they are paused from round robin. */
+  readonly paused: readonly string[];
+  /**
+   * False when no member is eligible. §153 makes a Team strategy invalid
+   * then, and the import must fail safely rather than fall back.
+   */
+  readonly viable: boolean;
 };
 
 /**
  * The teams offered, each with the members round robin could actually reach.
  *
- * `rotationPool` is the same helper the Sales Team screens use, so a member
- * paused there is absent here without anyone restating the rule.
+ * `rotationPool` is the same helper the Team screens use, so a member paused
+ * there is absent here without anyone restating the rule.
  */
 export const TEAM_OPTIONS: readonly TeamOption[] = SALES_TEAMS.filter(
   (t) => t.status === "Active",
@@ -82,6 +90,10 @@ export const TEAM_OPTIONS: readonly TeamOption[] = SALES_TEAMS.filter(
   id: team.id,
   name: team.name,
   eligible: rotationPool(team).map((id) => userById(id).name),
+  paused: activeMemberships(team)
+    .filter((m) => m.pausedFromRoundRobin)
+    .map((m) => userById(m.userId).name),
+  viable: rotationPool(team).length > 0,
 }));
 
 export type PersonOption = {
@@ -89,25 +101,31 @@ export type PersonOption = {
   readonly name: string;
   /** The one team this person belongs to, or null. */
   readonly teamName: string | null;
+  /**
+   * Shown so the screen can say why this person receives no automatic Lead
+   * while still being a valid direct-assignment target.
+   */
+  readonly pausedFromRoundRobin: boolean;
 };
 
 /**
  * Everyone who can be named as a Record Owner by hand.
  *
- * Active members of an active team — the people a demo audience has already
- * seen on the Sales Team screens. A manual choice is not a rotation, so a
- * paused member is still offered: pausing withholds someone from automatic
- * assignment, not from an administrator naming them (§163.5).
+ * Active operational members of an active team. A direct assignment is not a
+ * rotation, so a paused member IS still offered: §189.1 keeps assignment to a
+ * specific active Team Lead or Salesperson permitted even while that person
+ * is paused from round robin.
  */
 export const PERSON_OPTIONS: readonly PersonOption[] = SALES_TEAMS.filter(
   (t) => t.status === "Active",
 ).flatMap((team) =>
   activeMemberships(team)
-    .filter((m) => userById(m.userId).status === "Active")
+    .filter(mayReceiveManualAssignment)
     .map((m) => ({
       id: m.userId,
       name: userById(m.userId).name,
       teamName: activeTeamOf(m.userId)?.name ?? null,
+      pausedFromRoundRobin: m.pausedFromRoundRobin,
     })),
 );
 

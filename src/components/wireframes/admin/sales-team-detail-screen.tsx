@@ -21,7 +21,7 @@ import {
   Breadcrumbs,
   ConceptDialog,
   Consequences,
-  EligibilityChip,
+  RoundRobinChip,
   NothingSaved,
   RoleChip,
   StatusChip,
@@ -37,7 +37,10 @@ import {
   TableScroll,
 } from "@/components/wireframes/wf-ui";
 import {
-  ELIGIBILITY_LABEL,
+  PAUSE_ACTION,
+  PAUSE_EFFECT_NOTE,
+  RESUME_ACTION,
+  ROUND_ROBIN_LABEL,
   SALES_TEAMS,
   TEAMS_TODAY,
   USER,
@@ -45,23 +48,22 @@ import {
   activationCheck,
   activeMemberships,
   initialsOf,
-  mayReceiveLeads,
-  roleLabel,
+  managerOf,
+  mayReceiveAutomaticLeads,
   rulesTargeting,
   teamBySlug,
   teamLeadOf,
   userById,
-  type EligibilityChange,
-  type Eligibility,
+  type PauseChange,
   type Membership,
   type SalesTeam,
 } from "@/lib/wireframes/sales-teams";
 import { cn } from "@/lib/utils";
 
 /**
- * T2 — Sales Team detail and membership (Owner/Admin, spec §163.2–163.5).
+ * T2 — Team detail and membership (Admin, spec §163.2–163.5).
  *
- * Presented as Arun Menon, Owner/Admin. Every change here is an
+ * Presented as Arun Menon, Admin. Every change here is an
  * administrative action: adding an existing active user, a transfer, a Team
  * Lead replacement, an audited eligibility OVERRIDE, or deactivating the
  * team. None of it is offered to a Manager or an ordinary member, and the
@@ -81,7 +83,7 @@ type DialogState =
   | { kind: "add" }
   | { kind: "transfer"; preselect?: string }
   | { kind: "lead" }
-  | { kind: "override"; userId: string; to: Eligibility }
+  | { kind: "override"; userId: string; pause: boolean }
   | { kind: "status" };
 
 export function SalesTeamDetailScreen() {
@@ -94,10 +96,9 @@ export function SalesTeamDetailScreen() {
 
   const lead = rows.find((r) => r.teamLead);
   const leadUser = lead ? userById(lead.userId) : null;
-  const eligible = rows.filter(
-    (r) => r.eligibility === "Eligible" && mayReceiveLeads(r),
-  );
-  const paused = rows.filter((r) => r.eligibility === "Paused");
+  // Automatic eligibility excludes paused members (§189.1).
+  const eligible = rows.filter((r) => mayReceiveAutomaticLeads(r));
+  const paused = rows.filter((r) => r.pausedFromRoundRobin);
   const warning = !active
     ? "Team is inactive"
     : eligible.length === 0
@@ -114,14 +115,14 @@ export function SalesTeamDetailScreen() {
         <Breadcrumbs
           items={[
             { label: "Settings", href: "/wireframes/admin/settings" },
-            { label: "Sales Teams", href: "/wireframes/admin/teams" },
+            { label: "Teams", href: "/wireframes/admin/teams" },
             { label: TEAM.name },
           ]}
         />
 
         <ScreenHeading
           title={TEAM.name}
-          description={`${TEAM.description} Created ${TEAM.created}. Changes on this page are Owner/Admin actions and each one is audited.`}
+          description={`${TEAM.description} Created ${TEAM.created}. Changes on this page are Admin actions and each one is audited.`}
           actions={
             <>
               <button
@@ -172,7 +173,7 @@ export function SalesTeamDetailScreen() {
         />
 
         <div className="grid gap-4 md:grid-cols-3">
-          <SummaryCard title="Status and Team Lead">
+          <SummaryCard title="Status, Team Lead and Manager">
             <div className="flex flex-wrap items-center gap-2">
               <StatusChip status={active ? "Active" : "Inactive"} />
             </div>
@@ -184,23 +185,34 @@ export function SalesTeamDetailScreen() {
                     {leadUser.name}
                   </p>
                   <p className="mt-0.5 flex flex-wrap gap-1">
-                    <RoleChip label={roleLabel(leadUser.role)} />
+                    <RoleChip label={leadUser.role} />
                     <TeamLeadBadge />
                   </p>
                 </div>
               </div>
             ) : null}
+            <p className="mt-3 text-xs leading-relaxed text-muted-foreground">
+              Reports to{" "}
+              <span className="font-medium text-foreground">
+                {managerOf(TEAM).name}
+              </span>{" "}
+              ({managerOf(TEAM).role}), who supervises this team without being a
+              member of it.
+            </p>
           </SummaryCard>
 
-          <SummaryCard title="Lead-assignment eligibility">
+          <SummaryCard title="Automatic Lead assignment">
             <dl className="grid grid-cols-3 gap-2 text-center">
               <Count label="Active members" value={rows.length} />
-              <Count label="Eligible" value={eligible.length} />
+              <Count label="In round robin" value={eligible.length} />
               <Count label="Paused" value={paused.length} />
             </dl>
             <p className="mt-3 text-xs leading-relaxed text-muted-foreground">
-              The Team Lead is eligible by default and shares the rotation like
-              any other eligible member.
+              The Team Lead shares the rotation like any Salesperson. Admin and
+              Manager are never eligible recipients.
+            </p>
+            <p className="mt-2 text-xs leading-relaxed text-muted-foreground">
+              {PAUSE_EFFECT_NOTE}
             </p>
           </SummaryCard>
 
@@ -210,8 +222,8 @@ export function SalesTeamDetailScreen() {
                 <WarningChip>{warning}</WarningChip>
                 <p className="text-xs leading-relaxed text-danger-on-subtle">
                   New Leads routed to this team are kept, Unassigned, in
-                  Assignment Required. The Team Lead and Owner/Admin are
-                  alerted. Nothing falls back to another team.
+                  Assignment Required. The Team Lead and Admin are alerted.
+                  Nothing falls back to another team.
                 </p>
               </div>
             ) : (
@@ -251,15 +263,14 @@ export function SalesTeamDetailScreen() {
                     Lead-assignment eligibility
                   </th>
                   <th scope="col" className="px-4 py-2.5 font-medium">
-                    Owner/Admin override
+                    Admin override
                   </th>
                 </tr>
               </thead>
               <tbody>
                 {rows.map((row) => {
                   const user = userById(row.userId);
-                  const to: Eligibility =
-                    row.eligibility === "Eligible" ? "Paused" : "Eligible";
+                  const pauseNext = !row.pausedFromRoundRobin;
                   return (
                     <tr
                       key={row.userId}
@@ -279,7 +290,7 @@ export function SalesTeamDetailScreen() {
                         </span>
                       </td>
                       <td className="px-4 py-3">
-                        <RoleChip label={roleLabel(user.role)} />
+                        <RoleChip label={user.role} />
                       </td>
                       <td className="px-4 py-3">
                         {row.teamLead ? (
@@ -299,9 +310,15 @@ export function SalesTeamDetailScreen() {
                         </span>
                       </td>
                       <td className="px-4 py-3">
-                        <EligibilityChip value={row.eligibility} />
+                        <RoundRobinChip
+                          value={
+                            row.pausedFromRoundRobin
+                              ? "Paused from round robin"
+                              : "In round robin"
+                          }
+                        />
                         <span className="mt-1 block text-xs text-muted-foreground">
-                          {changeText(row.eligibilityChange)}
+                          {changeText(row.pauseChange)}
                         </span>
                       </td>
                       <td className="px-4 py-3">
@@ -312,14 +329,14 @@ export function SalesTeamDetailScreen() {
                             setDialog({
                               kind: "override",
                               userId: row.userId,
-                              to,
+                              pause: pauseNext,
                             })
                           }
                           aria-haspopup="dialog"
-                          aria-label={`Override: ${to === "Paused" ? "pause" : "make eligible"} ${user.name}`}
+                          aria-label={`${pauseNext ? PAUSE_ACTION : RESUME_ACTION}: ${user.name}`}
                           className={buttonClass("outline", "px-3")}
                         >
-                          {to === "Paused" ? "Pause" : "Make eligible"}
+                          {pauseNext ? "Pause" : "Resume"}
                         </button>
                       </td>
                     </tr>
@@ -461,9 +478,9 @@ export function SalesTeamDetailScreen() {
       {dialog?.kind === "override" ? (
         <OverrideDialog
           userId={dialog.userId}
-          to={dialog.to}
+          pause={dialog.pause}
           leavesNoneEligible={
-            dialog.to === "Paused" &&
+            dialog.pause &&
             eligible.length === 1 &&
             eligible[0]!.userId === dialog.userId
           }
@@ -477,10 +494,10 @@ export function SalesTeamDetailScreen() {
                 r.userId === dialog.userId
                   ? {
                       ...r,
-                      eligibility: dialog.to,
-                      eligibilityChange: {
+                      pausedFromRoundRobin: dialog.pause,
+                      pauseChange: {
                         byUserId: USER.arun,
-                        capacity: "Owner/Admin override",
+                        capacity: "Admin",
                         at: TEAMS_TODAY,
                       },
                     }
@@ -508,10 +525,10 @@ function newRow(userId: string, origin: NonNullable<Row["origin"]>): Row {
     userId,
     status: "Active",
     teamLead: false,
-    // §163.5: every member joins Eligible by default.
-    eligibility: "Eligible",
+    // Every member joins in the round robin; a pause is always deliberate.
+    pausedFromRoundRobin: false,
     joined: TEAMS_TODAY,
-    eligibilityChange: {
+    pauseChange: {
       byUserId: null,
       capacity: "Default on joining",
       at: TEAMS_TODAY,
@@ -520,12 +537,12 @@ function newRow(userId: string, origin: NonNullable<Row["origin"]>): Row {
   };
 }
 
-function changeText(change: EligibilityChange): string {
+function changeText(change: PauseChange): string {
   if (change.capacity === "Default on joining") {
     return `Default on joining · ${change.at}`;
   }
   const by = change.byUserId ? userById(change.byUserId).name : "System";
-  return `${change.capacity === "Team Lead" ? "By Team Lead" : "Owner/Admin override"} ${by} · ${change.at}`;
+  return `By ${change.capacity} ${by} · ${change.at}`;
 }
 
 function SummaryCard({
@@ -696,7 +713,7 @@ function AddMemberDialog({
                   <span className="min-w-0">
                     <span className="flex flex-wrap items-center gap-1.5 text-sm font-medium text-foreground">
                       {user.name}
-                      <RoleChip label={roleLabel(user.role)} />
+                      <RoleChip label={user.role} />
                     </span>
                     <span className="mt-0.5 block text-xs text-muted-foreground">
                       {blocked ?? "Active · not in a team"}
@@ -822,7 +839,7 @@ function TransferDialog({
                     <span className="min-w-0">
                       <span className="flex flex-wrap items-center gap-1.5 text-sm font-medium text-foreground">
                         {user.name}
-                        <RoleChip label={roleLabel(user.role)} />
+                        <RoleChip label={user.role} />
                         <span className="text-xs font-normal text-muted-foreground">
                           · {o.team.name}
                         </span>
@@ -950,8 +967,15 @@ function ReplaceLeadDialog({
                   />
                   <span className="flex flex-wrap items-center gap-1.5 text-sm text-foreground">
                     {user.name}
-                    <RoleChip label={roleLabel(user.role)} />
-                    <EligibilityChip value={m.eligibility} short />
+                    <RoleChip label={user.role} />
+                    <RoundRobinChip
+                      value={
+                        m.pausedFromRoundRobin
+                          ? "Paused from round robin"
+                          : "In round robin"
+                      }
+                      short
+                    />
                   </span>
                 </label>
               );
@@ -960,7 +984,7 @@ function ReplaceLeadDialog({
         </fieldset>
         <Consequences
           items={[
-            `${current.name} stays in the team as a member, keeps the ${roleLabel(current.role)} role and keeps their current eligibility.`,
+            `${current.name} stays in the team as a member, keeps the ${current.role} role and keeps their current eligibility.`,
             "The new Team Lead keeps their own workspace role. Team Lead is a responsibility, not a role.",
             "Former Team Lead responsibility stays visible in history.",
             "No Lead, Customer, Follow-up, Renewal or WhatsApp conversation is reassigned.",
@@ -973,14 +997,14 @@ function ReplaceLeadDialog({
 
 function OverrideDialog({
   userId,
-  to,
+  pause,
   leavesNoneEligible,
   isTeamLead,
   onClose,
   onConfirm,
 }: {
   userId: string;
-  to: Eligibility;
+  pause: boolean;
   leavesNoneEligible: boolean;
   isTeamLead: boolean;
   onClose: () => void;
@@ -989,7 +1013,8 @@ function OverrideDialog({
   const reasonId = useId();
   const [done, setDone] = useState(false);
   const user = userById(userId);
-  const verb = to === "Paused" ? "Pause" : "Make eligible";
+  const state = pause ? "Paused from round robin" : "In round robin";
+  const verb = pause ? PAUSE_ACTION : RESUME_ACTION;
 
   if (done) {
     return (
@@ -1001,8 +1026,8 @@ function OverrideDialog({
       >
         <div className="flex flex-col gap-3">
           <p className="text-sm text-foreground">
-            {user.name} is now shown as <strong>{ELIGIBILITY_LABEL[to]}</strong>
-            , recorded as an Owner/Admin override by Arun Menon.
+            {user.name} is now <strong>{ROUND_ROBIN_LABEL[state]}</strong>,
+            recorded as an Admin action by Arun Menon.
           </p>
           <NothingSaved />
         </div>
@@ -1014,14 +1039,12 @@ function OverrideDialog({
     <ConceptDialog
       open
       onClose={onClose}
-      title={`Owner/Admin override: ${verb.toLowerCase()} ${user.name}`}
-      description={`Changes ${user.name} to "${ELIGIBILITY_LABEL[to]}".`}
+      title={`${verb}: ${user.name}`}
+      description={`Sets ${user.name} to "${ROUND_ROBIN_LABEL[state]}". ${PAUSE_EFFECT_NOTE}`}
       footer={
         <CancelConfirm
           onCancel={onClose}
-          confirmLabel={
-            leavesNoneEligible ? "Pause anyway" : `${verb} — override`
-          }
+          confirmLabel={leavesNoneEligible ? "Pause anyway" : verb}
           tone={leavesNoneEligible ? "danger" : "primary"}
           onConfirm={() => {
             onConfirm();
@@ -1045,7 +1068,7 @@ function OverrideDialog({
                 This leaves {TEAM.name} with no eligible members.
               </strong>{" "}
               New Leads routed to the team will be kept in Assignment Required,
-              and the Team Lead and Owner/Admin will be alerted. You can still
+              and the Team Lead and Admin will be alerted. You can still
               continue if it is operationally necessary.
             </span>
           </div>
@@ -1060,11 +1083,13 @@ function OverrideDialog({
                   `${user.name} remains Team Lead and an active member either way.`,
                 ]
               : []),
-            ...(to === "Eligible"
+            ...(pause
               ? [
-                  "No backlog, compensation or priority: they are reached when the rotation next comes to them.",
+                  `${user.name} may still be given a Lead by an authorized manual assignment.`,
                 ]
-              : []),
+              : [
+                  "No backlog, compensation or priority: they are reached when the rotation next comes to them.",
+                ]),
             "This override is audited: who made it, when, the old and new value, and any reason given.",
           ]}
         />

@@ -42,7 +42,7 @@ import { cn } from "@/lib/utils";
 /**
  * T3 — Lead Assignment rules (Settings → Lead Assignment, spec §163.7).
  *
- * Every rule sends new Leads to exactly ONE Sales Team, by round robin. That
+ * Every rule sends new Leads to exactly ONE Team, by round robin. That
  * is the whole of the method list: there is no "all salespeople", no
  * workload routing, and nothing here assigns Customers, Follow-ups,
  * Renewals or conversations.
@@ -93,7 +93,7 @@ export function LeadAssignmentRulesScreen() {
 
         <ScreenHeading
           title="Lead Assignment"
-          description="Rules that give new Leads a Record Owner automatically. Each rule targets one Sales Team and rotates only among that team's eligible members."
+          description="Rules that give new Leads a Record Owner automatically. Each rule targets one Team and rotates only among that team's eligible members."
           actions={
             <>
               <Link
@@ -101,7 +101,7 @@ export function LeadAssignmentRulesScreen() {
                 className={buttonClass("outline")}
               >
                 <UsersRound className="size-4" aria-hidden="true" />
-                Sales Teams
+                Teams
               </Link>
               <button
                 type="button"
@@ -170,7 +170,7 @@ export function LeadAssignmentRulesScreen() {
                     Status
                   </th>
                   <th scope="col" className="px-4 py-2.5 font-medium">
-                    Target Sales Team
+                    Target Team
                   </th>
                   <th scope="col" className="px-4 py-2.5 font-medium">
                     Method
@@ -378,7 +378,7 @@ function CreateRuleDialog({
   const batchValid = /^\d+$/.test(batch.trim()) && Number(batch) >= 1;
   const errors = {
     name: name.trim() ? null : "Enter a rule name.",
-    team: teamId ? null : "Choose the one Sales Team this rule assigns to.",
+    team: teamId ? null : "Choose the one Team this rule assigns to.",
     batch: batchValid
       ? null
       : "Batch Size must be a whole number of 1 or more.",
@@ -435,7 +435,7 @@ function CreateRuleDialog({
       open={open}
       onClose={close}
       title="Create Lead assignment rule"
-      description="A rule assigns new Leads to the eligible members of exactly one Sales Team."
+      description="A rule assigns new Leads to the eligible members of exactly one Team."
       footer={
         <>
           <button
@@ -475,7 +475,7 @@ function CreateRuleDialog({
 
         <Field
           id={`${ids}-team`}
-          label="Target Sales Team — exactly one"
+          label="Target Team — exactly one"
           error={attempted ? errors.team : null}
           hint={teamWarn ? `Assignment warning: ${teamWarn}.` : undefined}
         >

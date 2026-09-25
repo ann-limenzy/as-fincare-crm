@@ -37,7 +37,7 @@ import {
   SALES_TEAMS,
   addCandidates,
   initialsOf,
-  roleLabel,
+  managerOf,
   rulesTargeting,
   teamCounts,
   teamLeadOf,
@@ -47,9 +47,9 @@ import {
 import { cn } from "@/lib/utils";
 
 /**
- * T1 — Sales Teams (Settings → Sales Teams, spec §163.12).
+ * T1 — Teams (Settings → Teams, spec §163.12).
  *
- * The administrative surface: Owner/Admin sees every team, who leads it, how
+ * The administrative surface: Admin sees every team, who leads it, how
  * many members are currently receiving automatic Leads, and where assignment
  * is failing. Team Leads do not come here — they use My Team on their phone.
  *
@@ -77,12 +77,12 @@ export function SalesTeamsScreen() {
         <Breadcrumbs
           items={[
             { label: "Settings", href: "/wireframes/admin/settings" },
-            { label: "Sales Teams" },
+            { label: "Teams" },
           ]}
         />
 
         <ScreenHeading
-          title="Sales Teams"
+          title="Teams"
           description={`Teams decide who shares ${WORKSPACE.name}'s automatic Leads. Each Lead assignment rule sends new Leads to exactly one team, and the rotation never leaves that team.`}
           actions={
             <>
@@ -141,6 +141,9 @@ export function SalesTeamsScreen() {
                     Team Lead
                   </th>
                   <th scope="col" className="px-4 py-2.5 font-medium">
+                    Reports to
+                  </th>
+                  <th scope="col" className="px-4 py-2.5 font-medium">
                     Status
                   </th>
                   <th
@@ -153,7 +156,7 @@ export function SalesTeamsScreen() {
                     scope="col"
                     className="px-3 py-2.5 text-right font-medium"
                   >
-                    Eligible
+                    In round robin
                   </th>
                   <th
                     scope="col"
@@ -220,7 +223,7 @@ export function SalesTeamsScreen() {
                                 {leadUser.name}
                               </span>
                               <span className="mt-0.5 flex flex-wrap gap-1">
-                                <RoleChip label={roleLabel(leadUser.role)} />
+                                <RoleChip label={leadUser.role} />
                                 <TeamLeadBadge />
                               </span>
                             </span>
@@ -228,6 +231,23 @@ export function SalesTeamsScreen() {
                         ) : (
                           <span className="text-muted-foreground">—</span>
                         )}
+                      </td>
+                      <td className="px-4 py-3">
+                        <span className="flex min-h-11 items-center gap-2.5">
+                          <Avatar
+                            initials={initialsOf(managerOf(team).name)}
+                            size="sm"
+                            tone="muted"
+                          />
+                          <span className="min-w-0">
+                            <span className="block font-medium text-foreground">
+                              {managerOf(team).name}
+                            </span>
+                            <span className="mt-0.5 flex flex-wrap gap-1">
+                              <RoleChip label={managerOf(team).role} />
+                            </span>
+                          </span>
+                        </span>
                       </td>
                       <td className="px-4 py-3">
                         <span className="flex min-h-11 items-center">
@@ -282,7 +302,7 @@ export function SalesTeamsScreen() {
               Team Leads work from My Team.
             </strong>{" "}
             They pause or restore their own team&apos;s members there, without
-            access to Settings. This screen is the Owner/Admin view.
+            access to Settings. This screen is the Admin view.
           </Note>
         </div>
       </div>
@@ -381,7 +401,7 @@ function CreateTeamDialog({
             onClick={close}
             className={buttonClass("primary")}
           >
-            Back to Sales Teams
+            Back to Teams
           </button>
         }
       >
@@ -483,7 +503,7 @@ function CreateTeamDialog({
                     <span className="min-w-0 flex-1">
                       <span className="flex flex-wrap items-center gap-1.5 text-sm font-medium text-foreground">
                         {user.name}
-                        <RoleChip label={roleLabel(user.role)} />
+                        <RoleChip label={user.role} />
                       </span>
                       <span className="mt-0.5 block text-xs text-muted-foreground">
                         {blocked ?? "Active · not in a team"}

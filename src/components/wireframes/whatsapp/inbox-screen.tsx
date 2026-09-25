@@ -10,7 +10,7 @@ import { ChannelMark } from "@/components/wireframes/whatsapp/parts";
 import { DeliveryTag } from "@/components/wireframes/whatsapp/parts";
 import { Avatar, ScreenHeading } from "@/components/wireframes/wf-ui";
 import { Button } from "@/components/ui/button";
-import { CONVERSATIONS } from "@/lib/wireframes/mock-data";
+import { CONVERSATIONS, CURRENT_USER } from "@/lib/wireframes/mock-data";
 import { cn } from "@/lib/utils";
 
 /**
@@ -47,7 +47,10 @@ export function InboxScreen() {
   const visible = CONVERSATIONS.filter((c) => {
     switch (filter) {
       case "mine":
-        return c.assignedTo === "Arun Menon";
+        // The desktop inbox is presented as an Admin, and §2.5 forbids a
+        // supervisor from being a conversation assignee — so this tab is
+        // correctly empty here. Batch 4 gives WhatsApp its full role model.
+        return c.assignedTo === CURRENT_USER.name;
       case "unassigned":
         return c.assignedTo === null;
       case "unread":

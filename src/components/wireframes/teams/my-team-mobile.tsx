@@ -21,40 +21,43 @@ import {
   PhoneSheet,
 } from "@/components/wireframes/phone-frame";
 import {
-  EligibilityChip,
+  RoundRobinChip,
   TeamLeadBadge,
 } from "@/components/wireframes/teams/team-parts";
 import { WireframeBrand } from "@/components/wireframes/wireframe-brand";
 import { Avatar } from "@/components/wireframes/wf-ui";
 import { SALES_PERSONA } from "@/lib/wireframes/mock-data";
 import {
-  ELIGIBILITY_LABEL,
+  PAUSE_ACTION,
+  PAUSE_EFFECT_NOTE,
+  RESUME_ACTION,
+  ROUND_ROBIN_LABEL,
   USER,
   activeMemberships,
   activeTeamOf,
-  eligibilityOf,
+  hypotheticalPool,
+  mayTogglePause,
+  pausedUserIdsOf,
+  managerOf,
   initialsOf,
-  rotationPool,
   teamLeadOf,
   userById,
-  type Eligibility,
-  type EligibilityMap,
 } from "@/lib/wireframes/sales-teams";
 import { cn } from "@/lib/utils";
 
 /**
  * T5 — My Team, on a phone (spec §163.6, §163.16).
  *
- * Sneha Thomas is a Sales Executive, and ALSO Team Lead of the Health
- * Insurance Team — a responsibility, shown as a badge beside the role, never
- * as a replacement for it.
+ * Sneha Thomas holds the Team Lead role (§2.1) and leads the Health
+ * Insurance Team. A Team Lead is both a supervisor within their own team and
+ * an operational user who may own and work records (§2.4).
  *
  * The screen is deliberately small. It shows the minimum roster §163.6
  * allows — name, membership status, eligibility, and who the Team Lead is —
  * and the controls that come with the responsibility: pause or restore a
  * member of their OWN team, themselves included. Everything administrative (adding,
  * transferring, replacing the Team Lead, rules, other teams) stays with the
- * Owner/Admin in Settings, and nothing here reveals another member's
+ * Admin in Settings, and nothing here reveals another member's
  * records, workload or assignment history.
  */
 
@@ -62,24 +65,23 @@ import { cn } from "@/lib/utils";
 const TEAM = activeTeamOf(USER.sneha)!;
 
 type SheetState =
-  | { kind: "confirm"; userId: string; to: Eligibility }
-  | { kind: "done"; userId: string; to: Eligibility };
+  | { kind: "confirm"; userId: string; pause: boolean }
+  | { kind: "done"; userId: string; pause: boolean };
 
 export function MyTeamMobileScreen() {
-  const [eligibility, setEligibility] = useState<EligibilityMap>(() =>
-    eligibilityOf(TEAM),
+  const [pausedIds, setPausedIds] = useState<ReadonlySet<string>>(() =>
+    pausedUserIdsOf(TEAM),
   );
   const [sheet, setSheet] = useState<SheetState | null>(null);
 
   const members = activeMemberships(TEAM);
-  const pool = rotationPool(TEAM, eligibility);
+  // A paused member is skipped by automatic assignment (§189.1), so the pool
+  // reflects the toggles this screen has applied.
+  const pool = hypotheticalPool(TEAM, pausedIds);
   const lead = teamLeadOf(TEAM);
-  const eligibleCount = members.filter(
-    (m) => eligibility[m.userId] === "Eligible",
-  ).length;
   const counts = {
-    eligible: eligibleCount,
-    paused: members.length - eligibleCount,
+    eligible: pool.length,
+    paused: members.filter((m) => pausedIds.has(m.userId)).length,
   };
 
   const closeSheet = () => setSheet(null);
@@ -95,40 +97,42 @@ export function MyTeamMobileScreen() {
                 <PhoneSheet
                   label={
                     sheet.kind === "done"
-                      ? "Eligibility updated"
-                      : "Change Lead-assignment eligibility"
+                      ? "Round-robin participation updated"
+                      : "Change round-robin participation"
                   }
                   onClose={closeSheet}
                 >
                   {sheet.kind === "confirm" ? (
                     <ConfirmSheet
                       userId={sheet.userId}
-                      to={sheet.to}
+                      pause={sheet.pause}
                       leavesNoneEligible={
-                        sheet.to === "Paused" &&
+                        sheet.pause &&
                         pool.length === 1 &&
                         pool[0] === sheet.userId
                       }
                       onCancel={closeSheet}
                       onConfirm={() => {
-                        setEligibility((prev) => ({
-                          ...prev,
-                          [sheet.userId]: sheet.to,
-                        }));
+                        setPausedIds((prev) => {
+                          const next = new Set(prev);
+                          if (sheet.pause) next.add(sheet.userId);
+                          else next.delete(sheet.userId);
+                          return next;
+                        });
                         setSheet({ ...sheet, kind: "done" });
                       }}
                     />
                   ) : (
                     <Confirmed
-                      title={
-                        sheet.userId === USER.sneha
-                          ? `You are ${sheet.to === "Paused" ? "paused" : "eligible again"}`
-                          : `${userById(sheet.userId).name} is ${sheet.to === "Paused" ? "paused" : "eligible again"}`
-                      }
+                      title={`${userById(sheet.userId).name} is ${
+                        sheet.pause
+                          ? "paused from round robin"
+                          : "back in round robin"
+                      }`}
                       detail={
-                        sheet.to === "Paused"
-                          ? "From the next automatic Lead onwards. Existing work has not moved."
-                          : "From the next automatic Lead onwards, with no backlog and no priority."
+                        sheet.pause
+                          ? "Skipped by automatic Leads from now on. Existing work has not moved, and a manual assignment is still possible."
+                          : "Eligible for automatic Leads again, with no backlog and no priority."
                       }
                       closeLabel="Back to My Team"
                       onClose={closeSheet}
@@ -185,8 +189,8 @@ export function MyTeamMobileScreen() {
                       {TEAM.name}
                     </h2>
                     <p className="mt-0.5 text-[11px] leading-snug text-muted-foreground">
-                      You lead this team. You choose which members receive new
-                      automatic Leads.
+                      You lead this team, which reports to{" "}
+                      {managerOf(TEAM).name} ({managerOf(TEAM).role}).
                     </p>
                   </div>
                 </div>
@@ -199,6 +203,9 @@ export function MyTeamMobileScreen() {
                   />
                   <Stat label="Paused" value={counts.paused} />
                 </dl>
+                <p className="mt-2 text-[10px] leading-snug text-muted-foreground">
+                  {PAUSE_EFFECT_NOTE}
+                </p>
               </section>
 
               {pool.length === 0 ? (
@@ -225,8 +232,8 @@ export function MyTeamMobileScreen() {
                       className="mt-0.5 size-3.5 shrink-0"
                       aria-hidden="true"
                     />
-                    You and the Owner/Admin will get an in-app alert for each
-                    one. Make someone eligible to start assigning again.
+                    You and the Admin will get an in-app alert for each one.
+                    Make someone eligible to start assigning again.
                   </p>
                 </section>
               ) : (
@@ -246,10 +253,12 @@ export function MyTeamMobileScreen() {
               <ul className="flex flex-col gap-2">
                 {members.map((m) => {
                   const user = userById(m.userId);
-                  const value = eligibility[m.userId] ?? "Paused";
+                  const paused = pausedIds.has(m.userId);
                   const isMe = m.userId === USER.sneha;
-                  const to: Eligibility =
-                    value === "Eligible" ? "Paused" : "Eligible";
+                  // §189.1: a Team Lead may pause a Salesperson in their own
+                  // team, but only their reporting Manager or an Admin may
+                  // pause the Team Lead. Sneha therefore cannot pause herself.
+                  const mayAct = mayTogglePause(USER.sneha, m.userId);
                   return (
                     <li
                       key={m.userId}
@@ -259,7 +268,7 @@ export function MyTeamMobileScreen() {
                         <Avatar
                           initials={initialsOf(user.name)}
                           size="sm"
-                          tone={value === "Eligible" ? "primary" : "muted"}
+                          tone={paused ? "muted" : "primary"}
                         />
                         <div className="min-w-0 flex-1">
                           <p className="flex flex-wrap items-center gap-x-1.5 gap-y-1">
@@ -281,29 +290,41 @@ export function MyTeamMobileScreen() {
                         </div>
                       </div>
                       <div className="flex flex-wrap items-center justify-between gap-2">
-                        <EligibilityChip value={value} />
-                        <button
-                          type="button"
-                          aria-haspopup="dialog"
-                          onClick={() =>
-                            setSheet({ kind: "confirm", userId: m.userId, to })
+                        <RoundRobinChip
+                          value={
+                            paused
+                              ? "Paused from round robin"
+                              : "In round robin"
                           }
-                          aria-label={
-                            isMe
-                              ? to === "Paused"
-                                ? "Pause yourself from Lead assignment"
-                                : "Make yourself eligible for Lead assignment"
-                              : `${to === "Paused" ? "Pause" : "Make eligible"}: ${user.name}`
-                          }
-                          className={cn(
-                            "inline-flex min-h-11 min-w-24 items-center justify-center rounded-lg px-3 text-[13px] font-semibold transition-colors",
-                            to === "Paused"
-                              ? "border border-border bg-surface text-foreground hover:bg-accent"
-                              : "bg-primary text-primary-foreground hover:bg-primary/90",
-                          )}
-                        >
-                          {to === "Paused" ? "Pause" : "Make eligible"}
-                        </button>
+                        />
+                        {mayAct ? (
+                          <button
+                            type="button"
+                            aria-haspopup="dialog"
+                            onClick={() =>
+                              setSheet({
+                                kind: "confirm",
+                                userId: m.userId,
+                                pause: !paused,
+                              })
+                            }
+                            aria-label={`${paused ? RESUME_ACTION : PAUSE_ACTION}: ${user.name}`}
+                            className={cn(
+                              "inline-flex min-h-11 min-w-24 items-center justify-center rounded-lg px-3 text-[13px] font-semibold transition-colors",
+                              paused
+                                ? "bg-primary text-primary-foreground hover:bg-primary/90"
+                                : "border border-border bg-surface text-foreground hover:bg-accent",
+                            )}
+                          >
+                            {paused ? "Resume" : "Pause"}
+                          </button>
+                        ) : (
+                          <span className="text-[11px] leading-snug text-muted-foreground">
+                            {isMe
+                              ? "Only your reporting Manager or an Admin can change your own round-robin participation."
+                              : "You cannot change this member's round-robin participation."}
+                          </span>
+                        )}
                       </div>
                     </li>
                   );
@@ -319,7 +340,7 @@ export function MyTeamMobileScreen() {
                   This list shows only who is in your team and whether they
                   receive new Leads. It does not open their Leads, Customers,
                   Follow-ups, Renewals, conversations or workload. Adding,
-                  moving or replacing members is done by your Owner/Admin.
+                  moving or replacing members is done by your Admin.
                 </p>
               </div>
             </div>
@@ -358,33 +379,27 @@ function Stat({
 
 function ConfirmSheet({
   userId,
-  to,
+  pause,
   leavesNoneEligible,
   onCancel,
   onConfirm,
 }: {
   userId: string;
-  to: Eligibility;
+  pause: boolean;
   leavesNoneEligible: boolean;
   onCancel: () => void;
   onConfirm: () => void;
 }) {
-  const isMe = userId === USER.sneha;
   const name = userById(userId).name;
-  const pausing = to === "Paused";
-  const title = pausing
-    ? isMe
-      ? "Pause yourself?"
-      : `Pause ${name}?`
-    : isMe
-      ? "Make yourself eligible?"
-      : `Make ${name} eligible?`;
+  const pausing = pause;
+  const state = pausing ? "Paused from round robin" : "In round robin";
+  const title = pausing ? `Pause ${name} from round robin?` : `Resume ${name}?`;
 
   return (
     <>
       <SheetHeader
         title={title}
-        subtitle={`Sets ${isMe ? "you" : name} to "${ELIGIBILITY_LABEL[to]}"`}
+        subtitle={`Sets ${name} to "${ROUND_ROBIN_LABEL[state]}"`}
         onClose={onCancel}
       />
       <div className="flex flex-col gap-2.5 border-t border-border pt-3">
@@ -407,11 +422,17 @@ function ConfirmSheet({
         <ul className="flex flex-col gap-1.5 text-[12px] leading-relaxed text-foreground">
           <Bullet>Only future automatic Leads are affected.</Bullet>
           <Bullet>
-            {isMe ? "Your" : `${name}'s`} existing Leads, Customers, Follow-ups,
-            Renewals and WhatsApp conversations do not change.
+            {name}&apos;s existing Leads, Customers, Follow-ups, Renewals and
+            WhatsApp conversations do not change.
           </Bullet>
-          {isMe ? (
-            <Bullet>You remain Team Lead and an active member.</Bullet>
+          <Bullet>
+            {name} stays an active user and a member of this team.
+          </Bullet>
+          {pausing ? (
+            <Bullet>
+              {name} may still be given a Lead by an authorized manual
+              assignment.
+            </Bullet>
           ) : null}
           {pausing ? null : (
             <Bullet>

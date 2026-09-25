@@ -84,7 +84,7 @@ describe("production isolation", () => {
     expect(offenders).toEqual([]);
   });
 
-  it("keeps the Sales Team wireframes free of data access, dialling and external links", () => {
+  it("keeps the Team wireframes free of data access, dialling and external links", () => {
     const files = WIREFRAME_SOURCES.filter((f) =>
       /sales-team|lead-assignment|teams[/\\]/.test(f),
     );

@@ -19,7 +19,7 @@ import { CrmChrome } from "@/components/wireframes/crm-chrome";
 import {
   Breadcrumbs,
   Consequences,
-  EligibilityChip,
+  RoundRobinChip,
   NothingSaved,
   RoleChip,
   StatusChip,
@@ -35,16 +35,15 @@ import {
 } from "@/components/wireframes/wf-ui";
 import {
   ROUTING_TBC,
-  eligibilityOf,
+  activeMemberships,
+  hypotheticalPool,
+  pausedUserIdsOf,
   initialsOf,
   previewAssignments,
-  roleLabel,
-  rotationPool,
   ruleBySlug,
   teamById,
   teamLeadOf,
   userById,
-  type EligibilityMap,
 } from "@/lib/wireframes/sales-teams";
 import { cn } from "@/lib/utils";
 
@@ -52,7 +51,7 @@ import { cn } from "@/lib/utils";
  * T4 — Round-robin rule detail and pool preview (spec §163.7–163.9).
  *
  * Shows what the rule WOULD do next, computed from the team's own order and
- * each member's eligibility — never a saved assignment. The demonstration
+ * each member's round-robin state — never a saved assignment. The demonstration
  * switches change only this preview, so the client can watch the pool
  * shrink to nothing and see Assignment Required take over, then restore a
  * member and see that nobody is compensated.
@@ -69,12 +68,14 @@ const PREVIEW_LENGTH = 4;
 type LastChange = { name: string; to: "Paused" | "Eligible" } | null;
 
 export function LeadAssignmentRuleScreen() {
-  const [eligibility, setEligibility] = useState<EligibilityMap>(() =>
-    eligibilityOf(TEAM),
+  const [pausedIds, setPausedIds] = useState<ReadonlySet<string>>(() =>
+    pausedUserIdsOf(TEAM),
   );
   const [lastChange, setLastChange] = useState<LastChange>(null);
 
-  const pool = rotationPool(TEAM, eligibility);
+  // The preview honours the demonstration toggles; the saved data is what
+  // `rotationPool(TEAM)` would return.
+  const pool = hypotheticalPool(TEAM, pausedIds);
   const preview = previewAssignments(
     TEAM.rotationOrder,
     pool,
@@ -86,24 +87,31 @@ export function LeadAssignmentRuleScreen() {
     ? userById(RULE.lastAssignedUserId)
     : null;
   const empty = pool.length === 0;
-  const changed = TEAM.rotationOrder.some(
-    (id) => eligibility[id] !== eligibilityOf(TEAM)[id],
-  );
+  const saved = pausedUserIdsOf(TEAM);
+  const changed =
+    pausedIds.size !== saved.size ||
+    [...pausedIds].some((id) => !saved.has(id));
 
-  const set = (userId: string, to: "Paused" | "Eligible") => {
-    setEligibility((prev) => ({ ...prev, [userId]: to }));
-    setLastChange({ name: userById(userId).name, to });
+  const set = (userId: string, pause: boolean) => {
+    setPausedIds((prev) => {
+      const next = new Set(prev);
+      if (pause) next.add(userId);
+      else next.delete(userId);
+      return next;
+    });
+    setLastChange({
+      name: userById(userId).name,
+      to: pause ? "Paused" : "Eligible",
+    });
   };
 
   const pauseAll = () => {
-    setEligibility((prev) =>
-      Object.fromEntries(Object.keys(prev).map((id) => [id, "Paused"])),
-    );
+    setPausedIds(new Set(activeMemberships(TEAM).map((m) => m.userId)));
     setLastChange({ name: "Every member", to: "Paused" });
   };
 
   const reset = () => {
-    setEligibility(eligibilityOf(TEAM));
+    setPausedIds(pausedUserIdsOf(TEAM));
     setLastChange(null);
   };
 
@@ -123,7 +131,7 @@ export function LeadAssignmentRuleScreen() {
 
         <ScreenHeading
           title={RULE.name}
-          description="Assigns each new Lead that uses this rule to the next eligible member of one Sales Team."
+          description="Assigns each new Lead that uses this rule to the next eligible member of one Team."
           actions={
             TEAM.detailHref ? (
               <Link href={TEAM.detailHref} className={buttonClass("outline")}>
@@ -136,7 +144,7 @@ export function LeadAssignmentRuleScreen() {
 
         <Panel title="Rule" icon={RouteIcon}>
           <dl className="grid gap-x-6 gap-y-4 px-4 py-4 sm:grid-cols-2 sm:px-5 xl:grid-cols-4">
-            <Item label="Target Sales Team">
+            <Item label="Target Team">
               {TEAM.detailHref ? (
                 <Link
                   href={TEAM.detailHref}
@@ -212,16 +220,16 @@ export function LeadAssignmentRuleScreen() {
                   <strong className="font-semibold text-foreground">
                     Demonstration controls.
                   </strong>{" "}
-                  They change this preview only. Real eligibility is changed by
-                  the Team Lead in My Team, or by an audited Owner/Admin
-                  override.
+                  They change this preview only. A real pause is applied by the
+                  Team Lead in My Team, or by the reporting Manager or an Admin
+                  for a Team Lead.
                 </span>
               </p>
 
               <ol className="flex flex-col gap-2">
                 {TEAM.rotationOrder.map((userId, i) => {
                   const user = userById(userId);
-                  const value = eligibility[userId] ?? "Paused";
+                  const paused = pausedIds.has(userId);
                   const inPool = pool.includes(userId);
                   const isLead = lead?.userId === userId;
                   return (
@@ -248,28 +256,31 @@ export function LeadAssignmentRuleScreen() {
                           <span className="font-medium text-foreground">
                             {user.name}
                           </span>
-                          <RoleChip label={roleLabel(user.role)} />
+                          <RoleChip label={user.role} />
                           {isLead ? <TeamLeadBadge /> : null}
                         </span>
                         <span className="mt-1 flex flex-wrap items-center gap-1.5">
-                          <EligibilityChip value={value} />
+                          <RoundRobinChip
+                            value={
+                              paused
+                                ? "Paused from round robin"
+                                : "In round robin"
+                            }
+                          />
                           <span className="text-xs text-muted-foreground">
-                            {inPool ? "In rotation" : "Excluded from rotation"}
+                            {inPool
+                              ? "Receives automatic Leads"
+                              : "Skipped by automatic Leads"}
                           </span>
                         </span>
                       </span>
                       <button
                         type="button"
-                        onClick={() =>
-                          set(
-                            userId,
-                            value === "Eligible" ? "Paused" : "Eligible",
-                          )
-                        }
-                        aria-label={`Demonstration: ${value === "Eligible" ? "pause" : "restore"} ${user.name}`}
+                        onClick={() => set(userId, !paused)}
+                        aria-label={`Demonstration: ${paused ? "resume" : "pause"} ${user.name}`}
                         className={buttonClass("outline", "px-3")}
                       >
-                        {value === "Eligible" ? "Pause" : "Restore"}
+                        {paused ? "Resume" : "Pause"}
                       </button>
                     </li>
                   );
@@ -435,7 +446,7 @@ function AssignmentRequiredPanel({ leadName }: { leadName: string | null }) {
                 aria-hidden="true"
               />
               {leadName ? `${leadName} (Team Lead)` : "The Team Lead"} and the
-              Owner/Admin receive an in-app alert.
+              Admin receive an in-app alert.
             </>,
             "An authorized user can assign it manually.",
             "No fallback: it is never given to another team or to the workspace at large.",

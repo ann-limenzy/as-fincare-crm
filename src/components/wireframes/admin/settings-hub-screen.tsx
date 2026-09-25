@@ -79,11 +79,11 @@ const CARDS: readonly Card[] = [
   {
     id: "sales-teams",
     href: "/wireframes/admin/teams",
-    title: "Sales Teams",
+    title: "Teams",
     icon: UsersRound,
     summary: `${SALES_TEAMS.length} teams`,
     detail:
-      "Groups of salespeople who share automatic Leads. Each team has one Team Lead, and each member is either eligible for new Leads or paused.",
+      "Each team has exactly one Team Lead and the Salespersons assigned to that Team Lead, and reports to one Manager.",
     items: [
       "Teams and Team Leads",
       "Members and transfers",
@@ -104,7 +104,7 @@ const CARDS: readonly Card[] = [
     icon: RouteIcon,
     summary: `${ACTIVE_RULES.length} active rules · round robin`,
     detail:
-      "Rules that give new Leads a Record Owner by rotating through one Sales Team's eligible members.",
+      "Rules that give new Leads a Record Owner by rotating through one Team's eligible members.",
     items: [
       "Assignment rules",
       "Target team",

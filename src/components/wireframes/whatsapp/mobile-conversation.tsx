@@ -313,7 +313,7 @@ function MoreSheet({
         />
         {/*
          * Spec §162 permission matrix: "Assign WhatsApp conversations" is
-         * Yes for Owner/Admin, Configurable for Manager, No for Staff/Sales.
+         * Yes for Admin, Configurable for Manager, No for a Salesperson.
          * This is the salesperson's phone, so it is not theirs to do.
          */}
         <SheetInactive
@@ -323,7 +323,7 @@ function MoreSheet({
         />
         {/*
          * Spec §112 names closing/reopening as its own permission, but the
-         * §162 matrix gives it no row — so whether a Sales Executive may do it
+         * §162 matrix gives it no row — so whether a Salesperson may do it
          * is genuinely undecided. Showing it as available would put a product
          * decision into the client's head as though it were settled, so the
          * capability is shown and the permission question left open.

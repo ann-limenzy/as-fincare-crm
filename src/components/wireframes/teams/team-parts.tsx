@@ -14,16 +14,17 @@ import { Dialog } from "radix-ui";
 import { useRef, type ReactNode } from "react";
 
 import {
-  ELIGIBILITY_LABEL,
-  type Eligibility,
+  ROUND_ROBIN_LABEL,
+  type RoundRobinState,
 } from "@/lib/wireframes/sales-teams";
 import { cn } from "@/lib/utils";
 
 /**
- * Shared pieces for the Sales Teams wireframes (spec §163).
+ * Shared pieces for the Teams wireframes (spec §163).
  *
  * The chips carry the exact wording the specification requires, so no screen
- * can drift into "Available" or turn Team Lead into a role.
+ * can drift into "Available". Team Lead is one of the four fixed roles
+ * (§2.1); `TeamLeadBadge` marks WHICH member of a roster holds it.
  */
 
 /* ---------------------------------------------------------------- buttons */
@@ -52,24 +53,36 @@ export function buttonClass(
 const CHIP =
   "inline-flex w-fit items-center gap-1 rounded-full border px-2.5 py-0.5 text-xs font-medium whitespace-nowrap";
 
-export function EligibilityChip({
+/**
+ * Whether a member takes part in automatic round robin.
+ *
+ * A pause is a real restriction now, so the paused state carries the warning
+ * tone. It restricts automatic assignment only — never the user's account,
+ * their records, or a manual assignment.
+ */
+export function RoundRobinChip({
   value,
   short = false,
 }: {
-  value: Eligibility;
-  /** "Eligible" / "Paused" where the full label is already in a heading. */
+  value: RoundRobinState;
+  /** Short form where the full label is already in a heading. */
   short?: boolean;
 }) {
+  const paused = value === "Paused from round robin";
   return (
     <span
       className={cn(
         CHIP,
-        value === "Eligible"
-          ? "border-success/30 bg-success-subtle text-success-on-subtle"
-          : "border-warning/30 bg-warning-subtle text-warning-on-subtle",
+        paused
+          ? "border-warning/30 bg-warning-subtle text-warning-on-subtle"
+          : "border-success/30 bg-success-subtle text-success-on-subtle",
       )}
     >
-      {short ? value : ELIGIBILITY_LABEL[value]}
+      {short
+        ? paused
+          ? "Paused"
+          : "In round robin"
+        : ROUND_ROBIN_LABEL[value]}
     </span>
   );
 }

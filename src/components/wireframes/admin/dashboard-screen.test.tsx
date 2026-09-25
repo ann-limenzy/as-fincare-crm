@@ -6,6 +6,7 @@ import {
   PIPELINE,
   PIPELINE_TOTALS,
   SETTINGS_USERS,
+  isOperationalRole,
 } from "@/lib/wireframes/mock-data";
 
 /**
@@ -41,14 +42,14 @@ describe("AdminDashboardScreen", () => {
     ).toBeNull();
   });
 
-  it("keeps New Leads at 18 and Renewals Due Soon at 22", () => {
+  it("keeps New Leads at 18 and Renewals Due Soon at 9", () => {
     render(<AdminDashboardScreen />);
     expect(screen.getByText("New Leads").nextElementSibling).toHaveTextContent(
       "18",
     );
     expect(
       screen.getByText("Renewals Due Soon").nextElementSibling,
-    ).toHaveTextContent("22");
+    ).toHaveTextContent("9");
   });
 
   it("lists no invited or deactivated user in Team workload", () => {
@@ -65,7 +66,9 @@ describe("AdminDashboardScreen", () => {
       ).toBe(false);
     }
     expect(rows).toHaveLength(
-      SETTINGS_USERS.filter((u) => u.status === "Active").length,
+      SETTINGS_USERS.filter(
+        (u) => u.status === "Active" && isOperationalRole(u.role),
+      ).length,
     );
   });
 });

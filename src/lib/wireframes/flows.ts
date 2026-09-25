@@ -342,7 +342,7 @@ export const FLOWS: readonly Flow[] = [
   },
   {
     id: "sales-teams",
-    name: "Sales Teams and Lead Assignment",
+    name: "Teams and Lead Assignment",
     icon: "UsersRound",
     description:
       "Who shares new Leads: teams that each rotate Leads among their own eligible members, the rules that send Leads to one team, and a Team Lead pausing members from a phone.",
@@ -350,8 +350,8 @@ export const FLOWS: readonly Flow[] = [
     steps: [
       {
         href: "/wireframes/admin/teams",
-        label: "Sales Teams",
-        title: "Sales Teams",
+        label: "Teams",
+        title: "Teams",
         summary:
           "Every team, its Team Lead, who is receiving Leads, and where assignment is failing.",
         device: "desktop",
@@ -361,7 +361,7 @@ export const FLOWS: readonly Flow[] = [
         label: "Team detail",
         title: "Team membership and eligibility",
         summary:
-          "Owner/Admin adds, transfers and overrides — none of which reassigns an existing record.",
+          "Admin adds, transfers and overrides — none of which reassigns an existing record.",
         device: "desktop",
       },
       {

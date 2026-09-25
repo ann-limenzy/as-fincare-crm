@@ -2,7 +2,6 @@ import { History, Mail, ShieldCheck, UserMinus, UserPlus } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import { CrmChrome } from "@/components/wireframes/crm-chrome";
-import { TeamLeadBadge } from "@/components/wireframes/teams/team-parts";
 import {
   Avatar,
   Note,
@@ -10,8 +9,14 @@ import {
   ScreenHeading,
   TableScroll,
 } from "@/components/wireframes/wf-ui";
-import { SETTINGS_USERS } from "@/lib/wireframes/mock-data";
-import { activeTeamOf, teamLeadOf } from "@/lib/wireframes/sales-teams";
+import { SETTINGS_USERS, type AppRole } from "@/lib/wireframes/mock-data";
+import {
+  activeMemberships,
+  activeTeamOf,
+  managerOf,
+  teamLeadOf,
+} from "@/lib/wireframes/sales-teams";
+import { RoundRobinChip } from "@/components/wireframes/teams/team-parts";
 import { cn } from "@/lib/utils";
 
 /**
@@ -22,9 +27,9 @@ import { cn } from "@/lib/utils";
  * activity stay exactly where they are. History is not rewritten when someone
  * leaves.
  *
- * Sales Team sits in its own column (§159). Team Lead is shown there, beside
- * the team, because it is a responsibility inside that team — the Role
- * column never says "Team Lead".
+ * Team sits in its own column (§159), with the Manager that team reports to
+ * through its Team Lead (§2.2). Team Lead is one of the four fixed roles
+ * (§2.1), so it is the Role column that says it.
  */
 
 const STATUS_CLASS = {
@@ -34,12 +39,13 @@ const STATUS_CLASS = {
     "border-border-strong/40 bg-neutral-subtle text-neutral-on-subtle",
 } as const;
 
-const ROLE_CLASS = {
-  Owner: "border-primary/30 bg-primary/12 text-primary",
+/** The four fixed roles (§2.1); supervisory roles carry the stronger tone. */
+const ROLE_CLASS: Record<AppRole, string> = {
   Admin: "border-primary/30 bg-primary/12 text-primary",
   Manager: "border-info/30 bg-info-subtle text-info-on-subtle",
-  Staff: "border-border bg-muted text-muted-foreground",
-} as const;
+  "Team Lead": "border-border-strong/40 bg-accent text-accent-foreground",
+  Salesperson: "border-border bg-muted text-muted-foreground",
+};
 
 export function UsersScreen() {
   return (
@@ -68,7 +74,7 @@ export function UsersScreen() {
                     Role
                   </th>
                   <th scope="col" className="px-4 py-2.5 font-medium">
-                    Sales Team
+                    Team
                   </th>
                   <th scope="col" className="px-4 py-2.5 font-medium">
                     Status
@@ -90,6 +96,12 @@ export function UsersScreen() {
                   const team = activeTeamOf(user.id);
                   const leads = team
                     ? teamLeadOf(team)?.userId === user.id
+                    : false;
+                  // Three distinct states: the account status above, and
+                  // whether an operational user takes part in round robin.
+                  const paused = team
+                    ? (activeMemberships(team).find((m) => m.userId === user.id)
+                        ?.pausedFromRoundRobin ?? false)
                     : false;
                   return (
                     <tr
@@ -137,11 +149,24 @@ export function UsersScreen() {
                         {team ? (
                           <span className="flex flex-col items-start gap-1">
                             <span className="text-foreground">{team.name}</span>
-                            {leads ? <TeamLeadBadge /> : null}
+                            <span className="text-xs text-muted-foreground">
+                              {leads ? "Leads this team · " : ""}Reports to{" "}
+                              {managerOf(team).name}
+                            </span>
+                            <RoundRobinChip
+                              value={
+                                paused
+                                  ? "Paused from round robin"
+                                  : "In round robin"
+                              }
+                              short
+                            />
                           </span>
                         ) : (
                           <span className="text-xs text-muted-foreground">
-                            Not in a team
+                            {user.role === "Admin" || user.role === "Manager"
+                              ? "Supervisory — not a team member"
+                              : "Not in a team"}
                           </span>
                         )}
                       </td>
@@ -176,7 +201,7 @@ export function UsersScreen() {
                               Edit role
                             </Button>
                           )}
-                          {user.status === "Active" && user.role !== "Owner" ? (
+                          {user.status === "Active" && user.role !== "Admin" ? (
                             <Button variant="ghost" size="sm">
                               <UserMinus
                                 className="size-3.5"
@@ -213,16 +238,20 @@ export function UsersScreen() {
           <Panel title="What each role can do" bodyClassName="p-4 sm:p-5">
             <dl className="flex flex-col gap-3 text-sm">
               <RoleRow
-                role="Owner / Admin"
-                detail="Everything, including settings, users and integrations."
+                role="Admin"
+                detail="Supervisory. Organization-wide visibility, settings, users and teams. Owns no operational record."
               />
               <RoleRow
                 role="Manager"
-                detail="Permitted leads and customers, team reports, reassignment."
+                detail="Supervisory. Sees only their own reporting hierarchy. Owns no operational record."
               />
               <RoleRow
-                role="Staff"
-                detail="Their own records, follow-ups and conversations. No configuration."
+                role="Team Lead"
+                detail="Operational. Leads exactly one team, reports to one Manager, and may own and work records."
+              />
+              <RoleRow
+                role="Salesperson"
+                detail="Operational. Belongs to one team and sees only the records assigned to them."
               />
             </dl>
           </Panel>

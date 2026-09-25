@@ -30,11 +30,10 @@ import { cn } from "@/lib/utils";
  * phone copy of the desktop shared inbox.
  *
  * Visibility follows spec §83: "Mine" is the conversations assigned to the
- * signed-in user, Unassigned is reserved for "Owner/Admin and permitted
- * Managers", and "Staff users should not automatically have access to all
- * workspace conversations". So this screen shows Sneha's own conversations
- * and offers no route to anyone else's — there is no All tab and no
- * Unassigned tab on the phone.
+ * signed-in user, the Unassigned queue is reserved for Admins and Managers,
+ * and a Salesperson has no automatic access to all conversations. So this
+ * screen shows Sneha's own conversations and offers no route to anyone
+ * else's — there is no All tab and no Unassigned tab on the phone.
  *
  * Ordering is operational rather than purely chronological, because the
  * question this screen answers is "what do I deal with first?". Nothing is

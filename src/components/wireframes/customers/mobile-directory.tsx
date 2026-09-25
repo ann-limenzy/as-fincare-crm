@@ -36,7 +36,7 @@ import { cn } from "@/lib/utils";
  * The salesperson's way into customer work when they are not already in a
  * conversation: find someone, see what is falling due, and act.
  *
- * VISIBILITY. Spec §162 gives Staff/Sales "View all Leads/Customers: No", and
+ * VISIBILITY. Spec §162 gives a Salesperson "View all Leads/Customers: No", and
  * §53 says the list shows "all Customers the user is permitted to access",
  * defaulting Staff to "My Customers ... owned/permitted Customers". So this
  * screen shows exactly two groups: the customers Sneha OWNS, and the ones

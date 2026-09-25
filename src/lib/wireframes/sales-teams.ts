@@ -1,9 +1,9 @@
 /**
- * Sales Teams and team-scoped Lead round robin — wireframe data (spec §163).
+ * Teams and team-scoped Lead round robin — wireframe data (spec §163).
  *
  * Data-only, like the rest of `src/lib/wireframes`: nothing here assigns a
  * Lead, stores a rotation position or reaches a database. The helpers below
- * only DESCRIBE the rules the specification sets, so the five Sales Team
+ * only DESCRIBE the rules the specification sets, so the five Team
  * screens and their tests read one model rather than five hand-typed copies.
  *
  * Every person is referenced by their `SETTINGS_USERS` id, never by a typed
@@ -11,49 +11,57 @@
  *
  * MEMBERSHIP MODEL (audited against SETTINGS_USERS):
  *
- *   Health Insurance Team    Sneha Thomas (Team Lead), Divya Mohan (paused),
- *                            Neha Thomas; Joseph Kurian — ended, deactivated
- *   Motor Insurance Team     Vikram Shah (Manager, Team Lead), Ajay Varma
- *   Life & Investments Team  Nisha George (Team Lead, paused by Owner/Admin)
+ *   Health Insurance Team    Sneha Thomas (Team Lead), Divya Mohan, Neha
+ *                            Thomas; Joseph Kurian — ended, deactivated
+ *   Motor Insurance Team     Ajay Varma (Team Lead), Kavya Raghavan
+ *   Life & Investments Team  Nisha George (Team Lead)
  *
- *   Not in any team          Arun Menon (Owner/Admin), Kavya Raghavan (new,
- *                            active), Fathima Rasheed (invited, so not yet
- *                            eligible to join), Joseph Kurian (deactivated)
+ *   All three teams report to Vikram Shah (Manager), who supervises them
+ *   without being a member of any of them (§2.2, §2.4).
+ *
+ *   Not in any team          Arun Menon (Admin), Vikram Shah (Manager),
+ *                            Fathima Rasheed (invited, so not yet eligible
+ *                            to join), Joseph Kurian (deactivated)
  *
  * Nothing here decides a question §163.18 leaves open: there is no routing
  * condition, no insertion rule for new members, no maximum Batch Size and no
  * behaviour for manual assignment or a reactivated team's rotation.
  */
 
-import { SETTINGS_USERS, type SettingsUser } from "@/lib/wireframes/mock-data";
+import {
+  SETTINGS_USERS,
+  isOperationalRole,
+  type SettingsUser,
+} from "@/lib/wireframes/mock-data";
 
 /* ----------------------------------------------------------------- labels */
 
-export type Eligibility = "Eligible" | "Paused";
+/**
+ * Whether a member takes part in their team's automatic round robin (§189.1).
+ *
+ * This is CONFIRMED behaviour, not a proposal: a paused member is skipped by
+ * automatic assignment. It is deliberately a state of its own and never
+ * overloads the user's Active/Inactive status, their role, their team
+ * membership, their workload or their record ownership.
+ */
+export type RoundRobinState = "In round robin" | "Paused from round robin";
 
-/** The only two labels §163.5 allows. Never "Available". */
-export const ELIGIBILITY_LABEL: Record<Eligibility, string> = {
-  Eligible: "Eligible for Lead assignment",
-  Paused: "Paused from Lead assignment",
+/** The approved wording. Never "Pause user", never "Available". */
+export const ROUND_ROBIN_LABEL: Record<RoundRobinState, string> = {
+  "In round robin": "In automatic round robin",
+  "Paused from round robin": "Paused from round robin",
 };
 
+/** The two action names §185.1 defines. */
+export const PAUSE_ACTION = "Pause from round robin";
+export const RESUME_ACTION = "Resume round robin participation";
+
 /**
- * Workspace role as the specification names it (§2, §159).
- *
- * Team Lead is deliberately absent: it is a responsibility inside one team,
- * shown beside the role, never instead of it.
+ * What a pause does, and just as importantly what it does not do.
+ * One sentence, shared, so every screen says the same thing.
  */
-export function roleLabel(role: SettingsUser["role"]): string {
-  switch (role) {
-    case "Owner":
-    case "Admin":
-      return "Owner/Admin";
-    case "Manager":
-      return "Manager";
-    case "Staff":
-      return "Staff/Sales";
-  }
-}
+export const PAUSE_EFFECT_NOTE =
+  "A paused member is skipped by automatic Lead assignment. They stay an active user, keep every record they already hold, and may still be given a Lead by an authorized manual assignment.";
 
 /**
  * Decision 1 in §163.18 is open, so no screen names a routing condition.
@@ -67,11 +75,15 @@ export const TEAMS_TODAY = "11 Sep 2026";
 
 /* ------------------------------------------------------------------ model */
 
-export type EligibilityChange = {
+export type PauseChange = {
   /** SETTINGS_USERS id of whoever made the change, or null for the default. */
   byUserId: string | null;
-  /** How the change was made — a Team Lead control or an Owner/Admin override. */
-  capacity: "Default on joining" | "Team Lead" | "Owner/Admin override";
+  /**
+   * In what capacity the change was made. §189.1 allows a Team Lead to pause
+   * a Salesperson in their own team, and only that Team Lead's reporting
+   * Manager or an Admin to pause the Team Lead.
+   */
+  capacity: "Default on joining" | "Team Lead" | "Reporting Manager" | "Admin";
   at: string;
 };
 
@@ -79,11 +91,16 @@ export type Membership = {
   userId: string;
   status: "Active" | "Ended";
   teamLead: boolean;
-  eligibility: Eligibility;
+  /**
+   * Paused from AUTOMATIC round robin only (§189.1). Never a substitute for
+   * deactivating the user: a paused person remains active, keeps their work,
+   * and remains a valid target for an authorized manual assignment.
+   */
+  pausedFromRoundRobin: boolean;
   joined: string;
   ended?: string;
   endedReason?: string;
-  eligibilityChange: EligibilityChange;
+  pauseChange: PauseChange;
 };
 
 export type TeamLeadHistory = {
@@ -99,6 +116,13 @@ export type SalesTeam = {
   name: string;
   description: string;
   status: "Active" | "Inactive";
+  /**
+   * The Manager this team reports to, through its Team Lead (§2.2).
+   *
+   * Each Team Lead reports to exactly one Manager, and a Manager supervises
+   * the team without being a member of it.
+   */
+  managerId: string;
   created: string;
   memberships: readonly Membership[];
   /**
@@ -120,11 +144,17 @@ export type LeadAssignmentRule = {
   slug: string;
   name: string;
   status: "Active" | "Inactive";
-  /** Exactly one Sales Team (§163.7). */
+  /** Exactly one Team (§163.7). */
   teamId: string;
   /** Fixed. §163.7 offers no other automatic method. */
   method: "Round Robin";
-  /** Positive whole number; the V1 default is 1. */
+  /**
+   * Positive whole number.
+   *
+   * PENDING CLIENT CONFIRMATION (§212): the default and maximum permitted
+   * batch size are open decisions. The values below are illustrative for
+   * each team and assert no default.
+   */
   batchSize: number;
   /** The member the stored rotation position points past (§163.8). */
   lastAssignedUserId: string | null;
@@ -136,7 +166,7 @@ export type LeadAssignmentRule = {
 /* ------------------------------------------------------------------- data */
 
 /**
- * Users who joined the workspace for the Sales Teams wireframes.
+ * Users who joined for the Teams wireframes.
  *
  * Kept here as ids so the screens can name them; the records themselves live
  * in SETTINGS_USERS with everyone else.
@@ -161,15 +191,16 @@ export const SALES_TEAMS: readonly SalesTeam[] = [
     name: "Health Insurance Team",
     description: "Health insurance enquiries and new policies.",
     status: "Active",
+    managerId: USER.vikram,
     created: "01 Jul 2026",
     memberships: [
       {
         userId: USER.sneha,
         status: "Active",
         teamLead: true,
-        eligibility: "Eligible",
+        pausedFromRoundRobin: false,
         joined: "01 Jul 2026",
-        eligibilityChange: {
+        pauseChange: {
           byUserId: null,
           capacity: "Default on joining",
           at: "01 Jul 2026",
@@ -179,9 +210,9 @@ export const SALES_TEAMS: readonly SalesTeam[] = [
         userId: USER.divya,
         status: "Active",
         teamLead: false,
-        eligibility: "Paused",
+        pausedFromRoundRobin: true,
         joined: "01 Jul 2026",
-        eligibilityChange: {
+        pauseChange: {
           byUserId: USER.sneha,
           capacity: "Team Lead",
           at: "10 Sep 2026",
@@ -191,9 +222,9 @@ export const SALES_TEAMS: readonly SalesTeam[] = [
         userId: USER.neha,
         status: "Active",
         teamLead: false,
-        eligibility: "Eligible",
+        pausedFromRoundRobin: false,
         joined: "01 Jul 2026",
-        eligibilityChange: {
+        pauseChange: {
           byUserId: null,
           capacity: "Default on joining",
           at: "01 Jul 2026",
@@ -205,11 +236,14 @@ export const SALES_TEAMS: readonly SalesTeam[] = [
         userId: USER.joseph,
         status: "Ended",
         teamLead: false,
-        eligibility: "Paused",
+        // Not paused: Joseph is excluded because the membership ended and the
+        // user is deactivated. Deactivation and a round-robin pause are
+        // different states and must not be conflated (§189.1).
+        pausedFromRoundRobin: false,
         joined: "01 Jul 2026",
         ended: "14 Aug 2026",
         endedReason: "User deactivated",
-        eligibilityChange: {
+        pauseChange: {
           byUserId: null,
           capacity: "Default on joining",
           at: "14 Aug 2026",
@@ -227,37 +261,42 @@ export const SALES_TEAMS: readonly SalesTeam[] = [
     name: "Motor Insurance Team",
     description: "Motor insurance and vehicle policy enquiries.",
     status: "Active",
+    managerId: USER.vikram,
     created: "01 Jul 2026",
     memberships: [
       {
-        // A Manager may lead a team and stays a Manager (§163.3). The Team
-        // Lead responsibility is what places Vikram in this team's rotation.
-        userId: USER.vikram,
+        // Vikram Shah supervises this team as its Manager and is NOT a
+        // member: §2.4 makes Manager supervisory, so he can neither lead the
+        // team nor sit in its rotation. Ajay, already an active member,
+        // holds the Team Lead role instead.
+        userId: USER.ajay,
         status: "Active",
         teamLead: true,
-        eligibility: "Eligible",
+        pausedFromRoundRobin: false,
         joined: "01 Jul 2026",
-        eligibilityChange: {
+        pauseChange: {
           byUserId: null,
           capacity: "Default on joining",
           at: "01 Jul 2026",
         },
       },
       {
-        userId: USER.ajay,
+        // §2.2 gives every Salesperson exactly one team. Kavya is an active
+        // Salesperson, so she belongs to one rather than to none.
+        userId: USER.kavya,
         status: "Active",
         teamLead: false,
-        eligibility: "Eligible",
+        pausedFromRoundRobin: false,
         joined: "01 Jul 2026",
-        eligibilityChange: {
+        pauseChange: {
           byUserId: null,
           capacity: "Default on joining",
           at: "01 Jul 2026",
         },
       },
     ],
-    rotationOrder: [USER.vikram, USER.ajay],
-    teamLeadHistory: [{ userId: USER.vikram, from: "01 Jul 2026" }],
+    rotationOrder: [USER.ajay, USER.kavya],
+    teamLeadHistory: [{ userId: USER.ajay, from: "01 Jul 2026" }],
     assignmentRequired: 0,
   },
   {
@@ -266,23 +305,27 @@ export const SALES_TEAMS: readonly SalesTeam[] = [
     name: "Life & Investments Team",
     description: "Term life cover and mutual fund SIP enquiries.",
     status: "Active",
+    managerId: USER.vikram,
     created: "15 Jul 2026",
     memberships: [
       {
         userId: USER.nisha,
         status: "Active",
         teamLead: true,
-        eligibility: "Paused",
+        pausedFromRoundRobin: true,
         joined: "15 Jul 2026",
-        eligibilityChange: {
+        pauseChange: {
           byUserId: USER.arun,
-          capacity: "Owner/Admin override",
+          capacity: "Admin",
           at: "08 Sep 2026",
         },
       },
     ],
     rotationOrder: [USER.nisha],
     teamLeadHistory: [{ userId: USER.nisha, from: "15 Jul 2026" }],
+    // Nisha is this team's only member and is paused from round robin, so the
+    // automatic pool is empty and new Leads wait in Assignment Required. This
+    // is the empty-pool fail-safe of §189.1, not a fallback.
     assignmentRequired: 3,
   },
 ];
@@ -333,7 +376,7 @@ export const LEAD_ASSIGNMENT_RULES: readonly LeadAssignmentRule[] = [
     teamId: "team-motor",
     method: "Round Robin",
     batchSize: 1,
-    lastAssignedUserId: USER.vikram,
+    lastAssignedUserId: USER.ajay,
     updated: "20 Aug 2026",
     updatedByUserId: USER.arun,
   },
@@ -381,6 +424,11 @@ export function teamLeadOf(team: SalesTeam): Membership | undefined {
   return activeMemberships(team).find((m) => m.teamLead);
 }
 
+/** The Manager a team reports to through its Team Lead (§2.2). */
+export function managerOf(team: SalesTeam): SettingsUser {
+  return userById(team.managerId);
+}
+
 export function rulesTargeting(teamId: string): readonly LeadAssignmentRule[] {
   return LEAD_ASSIGNMENT_RULES.filter((r) => r.teamId === teamId);
 }
@@ -394,47 +442,107 @@ export function activeTeamOf(userId: string): SalesTeam | undefined {
   );
 }
 
-/** Current eligibility for each active member, keyed by user id. */
-export type EligibilityMap = Readonly<Record<string, Eligibility>>;
+/** The round-robin state of each active member, keyed by user id. */
+export type RoundRobinMap = Readonly<Record<string, RoundRobinState>>;
 
-export function eligibilityOf(team: SalesTeam): EligibilityMap {
+export function roundRobinStateOf(team: SalesTeam): RoundRobinMap {
   return Object.fromEntries(
-    activeMemberships(team).map((m) => [m.userId, m.eligibility]),
+    activeMemberships(team).map((m) => [
+      m.userId,
+      m.pausedFromRoundRobin
+        ? ("Paused from round robin" as const)
+        : ("In round robin" as const),
+    ]),
   );
 }
 
 /**
- * Whether a member may receive Leads from this team at all (§163.8).
+ * Whether a member may receive an AUTOMATIC round-robin Lead (§189.1).
  *
- * Staff/Sales may. The team's active Team Lead may, whatever their role —
- * the responsibility satisfies the permission for their own team. Any other
- * role is "otherwise as permitted", which these wireframes do not settle, so
- * it is reported as not confirmed rather than assumed.
+ * Requires all four of: an active user, an operational role, active
+ * membership of this team, and not paused from round robin. Admin, Manager,
+ * inactive users and another team's users are excluded by the first three
+ * conditions, settled by role and state rather than by name anywhere.
  */
-export function mayReceiveLeads(member: Membership): boolean {
-  if (member.teamLead) return true;
-  return userById(member.userId).role === "Staff";
+export function mayReceiveAutomaticLeads(member: Membership): boolean {
+  if (member.status !== "Active") return false;
+  if (member.pausedFromRoundRobin) return false;
+  const user = userById(member.userId);
+  return user.status === "Active" && isOperationalRole(user.role);
 }
 
 /**
- * The rotation pool for a team, in its stable rotation order (§163.8).
+ * Whether a member may receive an authorized MANUAL/direct assignment.
+ *
+ * Identical to the automatic test except that a pause does not disqualify
+ * anyone: §189.1 keeps direct assignment to a specific active Team Lead or
+ * Salesperson permitted even while that person is paused from round robin.
+ */
+export function mayReceiveManualAssignment(member: Membership): boolean {
+  if (member.status !== "Active") return false;
+  const user = userById(member.userId);
+  return user.status === "Active" && isOperationalRole(user.role);
+}
+
+/**
+ * The automatic rotation pool for a team, in its stable rotation order.
  *
  * Only this team's members are considered — there is no path by which a
- * member of another team, or the workspace at large, enters the pool.
+ * member of another team, or the organization at large, enters the pool.
+ *
+ * Paused members are excluded structurally, inside this function. There is
+ * deliberately no optional filter argument a caller could forget to pass.
  */
-export function rotationPool(
+export function rotationPool(team: SalesTeam): readonly string[] {
+  if (team.status !== "Active") return [];
+  const members = activeMemberships(team);
+  return team.rotationOrder.filter((userId) => {
+    const member = members.find((m) => m.userId === userId);
+    return member ? mayReceiveAutomaticLeads(member) : false;
+  });
+}
+
+/**
+ * The pool this team WOULD have if `pausedUserIds` were the paused set.
+ *
+ * Deliberately a separate, explicitly named function rather than an optional
+ * argument on `rotationPool`, so the real path can never be called with a
+ * filter someone forgot to pass. Only the two screens that demonstrate
+ * pausing interactively use it.
+ */
+export function hypotheticalPool(
   team: SalesTeam,
-  eligibility: EligibilityMap = eligibilityOf(team),
+  pausedUserIds: ReadonlySet<string>,
 ): readonly string[] {
   if (team.status !== "Active") return [];
   const members = activeMemberships(team);
   return team.rotationOrder.filter((userId) => {
     const member = members.find((m) => m.userId === userId);
     if (!member) return false;
-    if (userById(userId).status !== "Active") return false;
-    if (!mayReceiveLeads(member)) return false;
-    return eligibility[userId] === "Eligible";
+    return (
+      mayReceiveAutomaticLeads({ ...member, pausedFromRoundRobin: false }) &&
+      !pausedUserIds.has(userId)
+    );
   });
+}
+
+/** The user ids currently paused from round robin in this team. */
+export function pausedUserIdsOf(team: SalesTeam): ReadonlySet<string> {
+  return new Set(
+    activeMemberships(team)
+      .filter((m) => m.pausedFromRoundRobin)
+      .map((m) => m.userId),
+  );
+}
+
+/**
+ * Members of this team who may be chosen for a manual/direct assignment,
+ * in roster order. A paused member appears here and not in `rotationPool`.
+ */
+export function manualAssignmentPool(team: SalesTeam): readonly string[] {
+  return activeMemberships(team)
+    .filter(mayReceiveManualAssignment)
+    .map((m) => m.userId);
 }
 
 /**
@@ -469,34 +577,26 @@ export function previewAssignments(
 
 export type TeamCounts = {
   active: number;
+  /** In the automatic rotation pool (§189.1). Excludes paused members. */
   eligible: number;
+  /** Paused from round robin, and therefore skipped by automatic assignment. */
   paused: number;
 };
 
-export function teamCounts(
-  team: SalesTeam,
-  eligibility: EligibilityMap = eligibilityOf(team),
-): TeamCounts {
+export function teamCounts(team: SalesTeam): TeamCounts {
   const members = activeMemberships(team);
-  const eligible = members.filter(
-    (m) => eligibility[m.userId] === "Eligible",
-  ).length;
   return {
     active: members.length,
-    eligible,
-    paused: members.length - eligible,
+    eligible: rotationPool(team).length,
+    paused: members.filter((m) => m.pausedFromRoundRobin).length,
   };
 }
 
 /** The assignment warning §163.5 and §163.7 require, or null. */
-export function teamWarning(
-  team: SalesTeam,
-  eligibility: EligibilityMap = eligibilityOf(team),
-): string | null {
+export function teamWarning(team: SalesTeam): string | null {
   if (team.status !== "Active") return "Team is inactive";
-  if (rotationPool(team, eligibility).length === 0) {
-    return "No eligible members";
-  }
+  if (!teamLeadOf(team)) return "No active Team Lead";
+  if (rotationPool(team).length === 0) return "No eligible members";
   return null;
 }
 
@@ -535,6 +635,14 @@ export function activationCheck(
       `A team needs exactly one active Team Lead to be activated. This team has ${leads.length}.`,
     );
   }
+  for (const m of leads) {
+    const user = userById(m.userId);
+    if (user.role !== "Team Lead") {
+      blockers.push(
+        `${user.name} is a ${user.role}. Only a user with the Team Lead role may lead a team.`,
+      );
+    }
+  }
 
   for (const m of active) {
     const user = userById(m.userId);
@@ -557,12 +665,9 @@ export function activationCheck(
     }
   }
 
-  const eligibleCount = active.filter(
-    (m) =>
-      m.eligibility === "Eligible" &&
-      userById(m.userId).status === "Active" &&
-      mayReceiveLeads(m),
-  ).length;
+  // Automatic eligibility only: a paused member is not counted, because a
+  // paused member receives no automatically assigned Lead (§189.1).
+  const eligibleCount = active.filter(mayReceiveAutomaticLeads).length;
 
   return { blockers, eligibleCount };
 }
@@ -573,6 +678,35 @@ export function activationCheck(
  * Adding never creates a user, never reactivates one, and never gives
  * anyone a second active team (§163.2, §163.12).
  */
+/**
+ * Who may pause or resume `target`'s round-robin participation (§189.1).
+ *
+ * A Team Lead may act on a Salesperson in their own team. A Team Lead may be
+ * acted on only by the Manager that team reports to, or by an Admin. Nobody
+ * else holds this authority, and a Salesperson never holds it at all.
+ */
+export function mayTogglePause(
+  actorUserId: string,
+  targetUserId: string,
+): boolean {
+  const actor = userById(actorUserId);
+  const team = activeTeamOf(targetUserId);
+  if (!team) return false;
+  const membership = activeMemberships(team).find(
+    (m) => m.userId === targetUserId,
+  );
+  if (!membership || !isOperationalRole(userById(targetUserId).role)) {
+    return false;
+  }
+  if (actor.role === "Admin") return true;
+  if (actor.role === "Manager") return team.managerId === actor.id;
+  if (actor.role === "Team Lead") {
+    // Only over a Salesperson in the team this Team Lead actually leads.
+    return teamLeadOf(team)?.userId === actor.id && !membership.teamLead;
+  }
+  return false; // a Salesperson never pauses anyone
+}
+
 export type Candidate = {
   user: SettingsUser;
   /** Null when the user can be added directly. */
@@ -585,6 +719,12 @@ export function addCandidates(teamId: string): readonly Candidate[] {
   return SETTINGS_USERS.map((user): Candidate | null => {
     const current = activeTeamOf(user.id);
     if (current?.id === teamId) return null;
+    if (!isOperationalRole(user.role)) {
+      return {
+        user,
+        blocked: `${user.role} is a supervisory role. Only Team Leads and Salespersons belong to a team.`,
+      };
+    }
     if (user.status === "Invited") {
       return {
         user,
