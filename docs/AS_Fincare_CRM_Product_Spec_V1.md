@@ -221,6 +221,9 @@ Admin may:
 >
 > • supervise assignment and reassignment across the organization
 >
+> • pause or resume any Team Lead from automatic Lead round-robin
+> assignment, anywhere in the organization
+>
 > • access organization-wide dashboards and reports
 
 Admin must not be the Record Owner or operational Assigned To user of:
@@ -252,6 +255,9 @@ Manager may:
 >
 > • assign and reassign records within their hierarchy where the
 > relevant workflow permits
+>
+> • pause or resume a Team Lead who reports to that Manager from
+> automatic Lead round-robin assignment
 >
 > • view dashboards and reports for their own branch
 >
@@ -295,6 +301,9 @@ Team Lead:
 > • may supervise and reassign work within their team where the relevant
 > workflow permits
 >
+> • may pause or resume a Salesperson in their own team from automatic
+> Lead round-robin assignment
+>
 > • must not see another Team Lead's team
 
 **Salesperson**
@@ -314,6 +323,19 @@ Salesperson:
 > • sees their own assigned operational records
 >
 > • does not receive organization-wide or peer visibility
+
+**Pause from round robin**
+
+A Team Lead or Salesperson may be paused from automatic Lead round-robin
+assignment. A Team Lead may pause or resume a Salesperson in their own
+team; a Team Lead may be paused or resumed only by the Manager to whom
+that Team Lead reports, or by an Admin. No other role holds this
+authority.
+
+This control governs automatic Lead distribution only. It does not
+deactivate the user, does not change record visibility, ownership or any
+other permission, and does not prevent an authorized manual or direct
+assignment. The full behaviour is defined in Section 189.1.
 
 ## 2.5 Ownership Model
 
@@ -2254,9 +2276,10 @@ provided.
 > within their permitted scope. Admins and Managers are never
 > selectable.
 >
-> • If no eligible active recipient exists in the selected team,
-> assignment fails safely and the Lead may remain Unassigned against
-> that team. It is never given to an Admin, a Manager or a user from
+> • If no eligible automatic recipient exists in the selected team —
+> every otherwise eligible member being inactive or paused from round
+> robin — assignment fails safely and the Lead may remain Unassigned
+> against that team. It is never given to an Admin, a Manager or a user from
 > another team.
 
 Custom Lead fields appear below the standard fields. See Section 194.
@@ -3159,11 +3182,12 @@ by manual assignment. Both are defined in Sections 189 and 189.1.
 **Automatic assignment**
 
 Automatic assignment is scoped to a single destination team. The
-eligible pool is that team's active Team Lead and active Salespersons.
-Admins, Managers, inactive users and users from other teams are never
+eligible pool is that team's active Team Lead and active Salespersons
+who are not paused from round robin. Admins, Managers, inactive users,
+users paused from round robin and users from other teams are never
 eligible recipients.
 
-If the destination team has no eligible active recipient, assignment
+If the destination team has no eligible automatic recipient, assignment
 fails safely: the Lead is not given to an Admin, a Manager or a user
 from another team, and the condition is surfaced rather than ignored.
 See Section 189.1.
@@ -5994,8 +6018,12 @@ round-robin pool at this point.
 Round robin continues to apply to the ordinary Lead-assignment paths
 defined elsewhere in this specification, including authorized manual Lead
 creation and bulk import. Those paths remain team-scoped, with a pool
-containing the team's active Team Lead and active Salespersons. See
-Sections 189 and 189.1.
+containing the team's active Team Lead and active Salespersons who are
+not paused from round robin. See Sections 189 and 189.1.
+
+Because this is a direct assignment rather than a rotation, round-robin
+pause status does not affect it: the selected Team Lead must be active,
+but may be paused from round robin.
 
 The selected Team Lead may subsequently reassign the Lead or the
 conversation within their own team, subject to the fixed permission rules
@@ -8284,7 +8312,10 @@ must not disclose a user or team the importing user cannot otherwise see.
 > Section 189.1
 >
 > • the eligible pool is that team's **active Team Lead and active
-> Salespersons**
+> Salespersons who are not paused from round robin**
+>
+> • members paused from round robin are excluded from the displayed
+> eligible-recipient list and from the automatic distribution
 >
 > • the team's configured **batch size** applies
 >
@@ -8292,7 +8323,7 @@ must not disclose a user or team the importing user cannot otherwise see.
 >
 > • records never spill into another team
 >
-> • if the team has no eligible active recipient, the strategy is
+> • if the team has no eligible automatic recipient, the strategy is
 > invalid and the import cannot proceed on it
 
 **Direct assignment**
@@ -8301,6 +8332,12 @@ Assigning to a specific Team Lead or Salesperson must respect hierarchy
 and role eligibility. The selected user must be active, must be a Team
 Lead or Salesperson, and must be within the importing user's permitted
 scope.
+
+Direct assignment does not use round-robin pause status. An active
+person who is paused from round robin remains selectable, and remains a
+valid destination, whenever the importing user is authorized to assign
+to them. Pausing withholds someone from automatic distribution only; it
+never blocks an explicit choice. See Section 189.1.
 
 **No generic fallback**
 
@@ -8361,16 +8398,19 @@ Possible validation issues include:
 Validation also checks the assignment strategy chosen in Step 3:
 
 > • the selected Team Lead or Salesperson is still active and still
-> within the importing user's permitted scope
+> within the importing user's permitted scope, whether or not they are
+> paused from round robin
 >
-> • the selected team still has at least one eligible active recipient
+> • a Team-based strategy still has at least one recipient who is active
+> and not paused from round robin
 >
 > • no row would be assigned to an Admin or a Manager
 >
 > • no row would be assigned outside the selected team
 
-If the assignment strategy itself is invalid — for example the selected
-team has no eligible active recipient — the import cannot proceed on that
+If the assignment strategy itself is invalid — for example every active
+member of the selected team is paused from round robin, leaving no
+eligible automatic recipient — the import cannot proceed on that
 strategy. The user must choose a different one. The import must not fall
 back to a different team, to the importing user, or to any Admin or
 Manager.
@@ -10163,6 +10203,9 @@ Show:
 > • Number of active Salespersons
 >
 > • Status
+>
+> • Whether each Team Lead and Salesperson is currently included in the
+> team's automatic round-robin pool
 
 Actions:
 
@@ -10177,6 +10220,10 @@ Actions:
 > • Deactivate Team
 >
 > • Reactivate Team
+>
+> • **Pause from round robin**
+>
+> • **Resume round robin participation**
 
 **Rules**
 
@@ -10195,6 +10242,22 @@ Actions:
 >
 > • A team cannot be deactivated while it has active Salespersons or
 > active operational records. These must be moved or reassigned first.
+>
+> • A Team Lead may apply **Pause from round robin** and **Resume round
+> robin participation** to a Salesperson in their own team. A Team Lead
+> may be paused or resumed only by the Manager to whom that Team Lead
+> reports, or by an Admin.
+>
+> • These two actions control automatic Lead distribution only. They do
+> not deactivate the user and do not change existing ownership of any
+> record. The behaviour is defined in Section 189.1.
+>
+> • The screen must show clearly, for every Team Lead and Salesperson,
+> whether that person is currently included in the team's automatic
+> round-robin pool.
+>
+> • Pausing and resuming round-robin participation are auditable
+> actions. See Section 208.
 
 Changing a team's Team Lead or reporting Manager changes future
 visibility. It must not rewrite historical activity, and it must not
@@ -10343,7 +10406,7 @@ Section 2 and must not contradict it.
 | May be operational Assigned To | No | No | Yes | Yes |
 | Dashboards and reports | Organization-wide roll-up | Roll-up for own branch | Own team, including own work | Own work only |
 | Assign and reassign operational records | Within the organization | Within own reporting hierarchy | Within own team | No |
-| Participates in automatic Lead assignment | No | No | Yes, within own team | Yes, within own team |
+| Participates in automatic Lead assignment | No | No | Yes, within own team, while active and not paused from round robin | Yes, within own team, while active and not paused from round robin |
 | Assign roles, hierarchy and teams | Yes | No | No | No |
 | Configure approved business data | Yes | No | No | No |
 | Create custom roles or edit role capabilities | No | No | No | No |
@@ -10355,6 +10418,14 @@ Manager visibility is fixed to the Manager's own reporting hierarchy. It
 is not configurable.
 
 Teams are part of the application, as defined in Sections 2.2 and 185.1.
+
+A Team Lead or Salesperson participates in automatic Lead assignment only
+while they are active and not paused from round robin. Pausing is
+confirmed behaviour: a Team Lead may pause or resume a Salesperson in
+their own team, and a Team Lead may be paused or resumed only by their
+reporting Manager or by an Admin. It withholds a person from automatic
+distribution only, and never from an authorized manual or direct
+assignment. See Sections 2.4 and 189.1.
 
 **Pending action-level decisions**
 
@@ -10397,10 +10468,6 @@ is confirmed.
 > • Which supervisory role is responsible for unassigned WhatsApp
 > conversations, and within what response expectation. *Pending client
 > confirmation before security implementation and UAT.*
->
-> • How temporary leave, pauses and availability affect a user's
-> participation in their team's automatic Lead assignment. *Pending
-> client confirmation before security implementation and UAT.*
 
 Once confirmed, each decision is implemented as fixed application
 behaviour for the relevant role. Later changes require a reviewed
@@ -10471,9 +10538,12 @@ enter the team's round-robin pool. See Section 101.
 
 For the selected team, the eligible automatic recipients are:
 
-> • the team's active Team Lead
+> • the team's active Team Lead, when not paused from round robin
 >
-> • the team's active Salespersons
+> • the team's active Salespersons who are not paused from round robin
+
+Automatic eligibility therefore requires a user to be **active and not
+paused from round robin**.
 
 The active Team Lead participates in the rotation on the same basis as
 the active Salespersons, because a Team Lead may personally work Leads
@@ -10487,11 +10557,74 @@ The following are never eligible recipients:
 >
 > • inactive users
 >
+> • users paused from round robin
+>
 > • any user belonging to another team
 
-Handling of temporary leave, pauses and availability is *pending client
-confirmation*. Until it is confirmed, only the active/inactive state
-determines eligibility.
+**Pause from round robin**
+
+A Team Lead or Salesperson may be paused from automatic round-robin
+assignment, and later resumed.
+
+Authority to pause and resume:
+
+> • A Team Lead may pause or resume a Salesperson belonging to their own
+> team.
+>
+> • A Team Lead may be paused or resumed only by the Manager to whom that
+> Team Lead reports, or by an Admin.
+
+Effect of a pause:
+
+> • Pausing affects only automatic team round-robin Lead assignment.
+>
+> • A paused person remains an active CRM user.
+>
+> • A paused person retains every Lead, Customer, Customer Purchase,
+> WhatsApp conversation, follow-up, renewal and other assigned record
+> they already hold.
+>
+> • Existing records must never be reassigned merely because their owner
+> has been paused.
+>
+> • A paused person may still receive a Lead through an authorized manual
+> assignment. Direct assignment to a specific active Team Lead or
+> Salesperson remains permitted even when that person is paused from
+> round robin.
+>
+> • New automatic round-robin assignments skip every paused member.
+
+Resuming:
+
+> • When resumed, the person becomes eligible for future round-robin
+> assignments again.
+>
+> • Resuming does not retroactively allocate Leads that were skipped
+> while the person was paused.
+
+Safety:
+
+> • If every otherwise eligible member of a team is paused, that team has
+> no eligible automatic round-robin recipient, and the empty-pool
+> behaviour defined below applies unchanged.
+>
+> • Pausing must never cause assignment to spill into another team, and
+> must never cause a fallback to an Admin or a Manager.
+>
+> • Pause and resume must be authorized on the server, and each action is
+> recorded in audit history. See Section 208.
+
+The interface term is **Pause from round robin**, never the ambiguous
+"Pause user".
+
+The distinction from deactivation is exact:
+
+> • An **inactive** user cannot receive automatic or manual operational
+> assignments at all.
+>
+> • A user who is **active but paused from round robin** is skipped by
+> automatic round robin, and may still receive an authorized manual or
+> direct assignment.
 
 **Batch size**
 
@@ -10530,6 +10663,9 @@ Rules:
 >
 > • Each team has its own batch size and its own rotation position.
 >
+> • A member paused from round robin is skipped, and rotation moves to
+> the next member who is active and not paused.
+>
 > • Admin and Manager never enter the rotation.
 >
 > • A batch size of zero or a negative value must not be accepted.
@@ -10547,8 +10683,9 @@ client confirmation*.
 
 **Empty or unavailable team pool**
 
-If the selected team has no eligible active recipient, automatic
-assignment must fail safely and visibly.
+If the selected team has no eligible automatic recipient — because every
+otherwise eligible member is inactive or paused from round robin —
+automatic assignment must fail safely and visibly.
 
 > • The Lead must not be assigned to an Admin or a Manager.
 >
@@ -11423,7 +11560,7 @@ the application must then explain what is missing.
 > required policy documents to be complete.
 >
 > • **Automatic Lead assignment** requires a destination team with at
-> least one eligible active recipient.
+> least one recipient who is active and not paused from round robin.
 >
 > • **Incentive calculation** requires configured slabs and rules, and
 > eligible Closed Amount from `Closed/Active` purchases.
@@ -12027,6 +12164,11 @@ Admin, is given an interface to alter or remove an audit entry.
 >
 > • user activation and deactivation
 >
+> • pausing a person from automatic Lead round-robin assignment, and
+> resuming their round-robin participation. Each entry retains the
+> acting user, the target user, the timestamp, the previous state, the
+> new state and the relevant team and reporting scope
+>
 > • Lead Stage changes
 >
 > • Lead Priority changes
@@ -12546,9 +12688,6 @@ approved before security implementation and UAT.
 
 **Assignment and hierarchy**
 
-> • How temporary leave, pauses and availability affect a user's
-> participation in their team's round robin.
->
 > • The default and maximum permitted round-robin batch size.
 >
 > • Escalation behaviour when a destination team has no eligible active
