@@ -7,6 +7,7 @@ import type { Route } from "next";
 import Link from "next/link";
 
 import { Button } from "@/components/ui/button";
+import { AssignmentSummary } from "@/components/wireframes/import/assignment-summary";
 import { ImportShell } from "@/components/wireframes/import/import-shell";
 import { Note, Panel, TableScroll } from "@/components/wireframes/wf-ui";
 import { VALIDATION_ISSUES } from "@/lib/wireframes/mock-data";
@@ -42,6 +43,8 @@ export function ResolveScreen() {
       title="Resolve issues"
       description="Each row below needs one decision. Rows you leave alone stay outside the import — they are never guessed at."
     >
+      <AssignmentSummary title="Assignment to be applied" />
+
       <Panel
         title="Rows to resolve"
         icon={Wrench}

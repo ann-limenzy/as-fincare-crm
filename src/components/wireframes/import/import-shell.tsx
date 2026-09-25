@@ -11,16 +11,16 @@ export const IMPORT_STEPS = [
   "Validate",
   "Resolve issues",
   "Confirm",
-  "Processing",
+  "Process",
   "Results",
 ] as const;
 
 /**
  * Frame shared by the import screens.
  *
- * Eight stages, seven of them a screen: "Processing" happens in the
- * background after Confirm, so it is a stage the rail reports rather than
- * somewhere the admin waits.
+ * Eight stages, each with its own screen, so every stage of §144's workflow
+ * is directly demonstrable — including Processing (§159), which sits between
+ * Confirm and Results.
  *
  * The step rail is the spine of this flow: at every point the admin can see
  * how far through they are and that nothing has been written yet.

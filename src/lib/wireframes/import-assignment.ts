@@ -23,6 +23,7 @@ import {
   mayReceiveManualAssignment,
   configFor,
   configIsViable,
+  nextAutomaticRecipients,
   rotationPool,
   userById,
   type SalesTeam,
@@ -31,14 +32,22 @@ import { COLUMN_MAPPINGS } from "@/lib/wireframes/mock-data";
 
 /* ---------------------------------------------------------------- methods */
 
-export type AssignmentMethod = "team" | "person" | "spreadsheet" | "review";
+/**
+ * The three strategies §152 permits, and no others.
+ *
+ * "Use CRM assignment rules" is deliberately absent: §152 states there is no
+ * organization-wide default assignment rule to fall back on. Reading each
+ * row's mapped Record Owner is not a fourth strategy either — §148 makes an
+ * eligible mapped owner take precedence over whichever of these three is
+ * chosen, automatically, for that row only.
+ */
+export type AssignmentMethod = "team-lead" | "salesperson" | "team";
 
 /** Every method the screen offers, and the only values `parse` accepts. */
 export const ASSIGNMENT_METHODS: readonly AssignmentMethod[] = [
+  "team-lead",
+  "salesperson",
   "team",
-  "person",
-  "spreadsheet",
-  "review",
 ];
 
 export function isAssignmentMethod(value: unknown): value is AssignmentMethod {
@@ -47,14 +56,16 @@ export function isAssignmentMethod(value: unknown): value is AssignmentMethod {
 
 export type AssignmentChoice = {
   /**
-   * `null` until the admin chooses. Nothing is preselected: with the rules
-   * option withheld there is no method that is right by default, and a
-   * silent default would be a decision the screen made on someone's behalf.
+   * `null` until the admin chooses. §152 requires no default and no implicit
+   * strategy, so nothing is preselected and Continue stays unavailable.
    */
   readonly method: AssignmentMethod | null;
   /** Team id, when `method` is `team`. Empty until one is chosen. */
   readonly teamId: string;
-  /** SETTINGS_USERS id, when `method` is `person`. Empty until chosen. */
+  /**
+   * SETTINGS_USERS id, when `method` is `team-lead` or `salesperson`.
+   * Empty until chosen.
+   */
   readonly userId: string;
 };
 
@@ -140,10 +151,25 @@ export const PERSON_OPTIONS: readonly PersonOption[] = SALES_TEAMS.filter(
     })),
 );
 
+/** Team Leads a direct assignment may name (§152). */
+export const TEAM_LEAD_OPTIONS: readonly PersonOption[] = PERSON_OPTIONS.filter(
+  (p) => userById(p.id).role === "Team Lead",
+);
+
+/** Salespersons a direct assignment may name (§152). */
+export const SALESPERSON_OPTIONS: readonly PersonOption[] =
+  PERSON_OPTIONS.filter((p) => userById(p.id).role === "Salesperson");
+
 /* --------------------------------------------------- mapped column lookup */
 
-/** CRM fields that decide who owns an imported Lead. */
-const ASSIGNMENT_FIELDS = ["Record Owner", "Sales Team"] as const;
+/**
+ * The CRM destination field that decides who owns an imported Lead.
+ *
+ * Only "Record Owner". An earlier draft also listed "Sales Team" here, but
+ * that is not a CRM destination field at all — it appears in neither
+ * `CRM_FIELDS` nor any row of `COLUMN_MAPPINGS`, so it could never match.
+ */
+const ASSIGNMENT_FIELDS = ["Record Owner"] as const;
 
 /**
  * The spreadsheet column currently mapped to an assignment field, if any.
@@ -173,52 +199,101 @@ export function personOption(id: string): PersonOption | undefined {
 }
 
 /**
- * Whether the choice is complete enough to continue.
+ * Why the current choice cannot be used, or null when it can.
  *
- * A team with nobody eligible is a COMPLETE choice, not an invalid one: the
- * screen warns that those Leads land in Assignment Required, and the admin may
- * still mean it.
+ * Always evaluated against the CURRENT mock data, so a choice restored from
+ * a previous session is revalidated rather than trusted: a team whose pool
+ * has since emptied, or a person who has since been deactivated, comes back
+ * invalid however it was stored.
+ *
+ * §153 makes an empty-pool Team an INVALID strategy, not merely a warned-about
+ * one — the import cannot proceed on it, and must not fall back.
  */
-export function isChoiceComplete(choice: AssignmentChoice): boolean {
+export function choiceProblem(choice: AssignmentChoice): string | null {
   switch (choice.method) {
     case null:
-      return false;
-    case "team":
-      return teamOption(choice.teamId) !== undefined;
-    case "person":
-      return personOption(choice.userId) !== undefined;
-    case "spreadsheet":
-      return MAPPED_ASSIGNMENT_COLUMN !== null;
-    case "review":
-      return true;
+      return "Choose how imported Leads should be assigned.";
+    case "team": {
+      const team = teamOption(choice.teamId);
+      if (!team) return "Choose a Team to continue.";
+      if (!team.viable) {
+        return `${team.name} has no member who is active and in round robin, so this strategy cannot be used. Choose another Team, or assign to a specific person.`;
+      }
+      return null;
+    }
+    case "team-lead": {
+      const person = personOption(choice.userId);
+      if (!person || userById(person.id).role !== "Team Lead") {
+        return "Choose a Team Lead to continue.";
+      }
+      return null;
+    }
+    case "salesperson": {
+      const person = personOption(choice.userId);
+      if (!person || userById(person.id).role !== "Salesperson") {
+        return "Choose a Salesperson to continue.";
+      }
+      return null;
+    }
   }
+}
+
+/** Whether the choice is valid and complete enough to continue. */
+export function isChoiceComplete(choice: AssignmentChoice): boolean {
+  return choiceProblem(choice) === null;
 }
 
 /** One sentence describing what the current choice will do. */
 export function choiceSummary(choice: AssignmentChoice): string {
+  const problem = choiceProblem(choice);
+  if (problem) return problem;
   switch (choice.method) {
     case null:
-      return "Choose an assignment method to continue.";
+      return "Choose how imported Leads should be assigned.";
+    case "team": {
+      const team = teamOption(choice.teamId)!;
+      return `Imported Leads rotate between ${formatNames(team.eligible)} using ${team.name}'s one round-robin configuration, batch size ${team.batchSize}. The Team is never the Record Owner — round robin selects one of these people for each Lead.`;
+    }
+    case "team-lead":
+    case "salesperson": {
+      const person = personOption(choice.userId)!;
+      return `Every imported Lead receives ${person.name} as Record Owner. This is a direct assignment: no batch size applies and no team's rotation position moves.`;
+    }
+  }
+}
+
+/**
+ * A short label naming the strategy, for the review, confirmation,
+ * processing and result screens to repeat identically.
+ */
+export function choiceLabel(choice: AssignmentChoice): string {
+  switch (choice.method) {
+    case null:
+      return "Not chosen";
     case "team": {
       const team = teamOption(choice.teamId);
-      if (!team) return "Choose a Sales Team to continue.";
-      if (team.eligible.length === 0) {
-        return `${team.name} has no eligible members, so every imported Lead will enter Assignment Required rather than receiving a Record Owner.`;
-      }
-      return `Imported Leads will rotate between ${formatNames(team.eligible)} using ${team.name}'s round-robin rule. The team is not the Record Owner — round robin selects one of these people for each Lead.`;
+      return team
+        ? `Team → ${team.name} (round robin, batch size ${team.batchSize})`
+        : "Team → not chosen";
     }
-    case "person": {
+    case "team-lead": {
       const person = personOption(choice.userId);
-      if (!person) return "Choose a salesperson to continue.";
-      return `Every imported Lead will receive ${person.name} as Record Owner. This manual assignment does not move any team's round-robin position.`;
+      return person
+        ? `Team Lead → ${person.name} (direct assignment)`
+        : "Team Lead → not chosen";
     }
-    case "spreadsheet":
-      return MAPPED_ASSIGNMENT_COLUMN
-        ? `Each row's own "${MAPPED_ASSIGNMENT_COLUMN}" value decides its Record Owner. Values that are invalid, inactive or unknown are reported during validation, never guessed.`
-        : "No Team or Record Owner column is mapped, so there is nothing to read an assignment from.";
-    case "review":
-      return "Every imported Lead enters Assignment Required. Nothing appears in an individual salesperson's work queue until someone assigns it.";
+    case "salesperson": {
+      const person = personOption(choice.userId);
+      return person
+        ? `Salesperson → ${person.name} (direct assignment)`
+        : "Salesperson → not chosen";
+    }
   }
+}
+
+/** True when this strategy distributes by round robin rather than directly. */
+export function isTeamStrategy(choice: AssignmentChoice): boolean {
+  return choice.method === "team";
 }
 
 /** "A and B", "A, B and C" — never a trailing comma before "and". */
@@ -226,6 +301,61 @@ export function formatNames(names: readonly string[]): string {
   if (names.length === 0) return "nobody";
   if (names.length === 1) return names[0]!;
   return `${names.slice(0, -1).join(", ")} and ${names[names.length - 1]!}`;
+}
+
+/* ------------------------------------------- mapped Record Owner rows */
+
+/**
+ * How many rows carry an eligible mapped Record Owner, and how many fall
+ * through to the Step 3 strategy.
+ *
+ * §148: where a row's mapped owner is eligible it takes precedence over the
+ * Step 3 strategy for that row; rows without an eligible mapped owner follow
+ * the strategy. Nothing is silently substituted — a mapped owner that cannot
+ * be matched to an eligible active user is surfaced as a Need Attention row
+ * (the "Unknown Record Owner" issue), never quietly replaced.
+ */
+export const MAPPED_OWNER_ROWS = {
+  /** Rows whose mapped owner matched an eligible active user. */
+  eligible: 118,
+  /**
+   * Rows whose mapped owner could not be matched, surfaced for resolution.
+   *
+   * Illustrative mapping detail only. It does not redefine the overall
+   * validation category: Need Attention covers several problems, of which an
+   * unmatched owner is one.
+   */
+  unmatched: 12,
+} as const;
+
+/** Rows that will follow the Step 3 strategy rather than a mapped owner. */
+export function rowsFollowingStrategy(readyRows: number): number {
+  return Math.max(0, readyRows - MAPPED_OWNER_ROWS.eligible);
+}
+
+/**
+ * The distribution a Team strategy actually produces for `rows` records.
+ *
+ * Walks the destination team's one configuration, so the batch size and the
+ * pool are the same ones every other screen shows. Paused and inactive
+ * members never appear, because they are not in the pool.
+ */
+export function teamDistribution(
+  teamId: string,
+  rows: number,
+): readonly { name: string; count: number }[] {
+  const team = SALES_TEAMS.find((t) => t.id === teamId);
+  if (!team || rows <= 0) return [];
+  const pool = rotationPool(team);
+  if (pool.length === 0) return [];
+  const counts = new Map<string, number>(pool.map((id) => [id, 0]));
+  for (const id of nextAutomaticRecipients(team, rows)) {
+    counts.set(id, (counts.get(id) ?? 0) + 1);
+  }
+  return [...counts].map(([id, count]) => ({
+    name: userById(id).name,
+    count,
+  }));
 }
 
 /* ------------------------------------------------------------------ store */

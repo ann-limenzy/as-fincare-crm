@@ -1,9 +1,12 @@
+"use client";
+
 import {
   CircleCheck,
   Download,
   History,
   SkipForward,
   Upload,
+  UserX,
   XCircle,
 } from "lucide-react";
 
@@ -11,6 +14,7 @@ import type { Route } from "next";
 import Link from "next/link";
 
 import { Button } from "@/components/ui/button";
+import { AssignmentSummary } from "@/components/wireframes/import/assignment-summary";
 import { ImportShell } from "@/components/wireframes/import/import-shell";
 import { Panel, TableScroll } from "@/components/wireframes/wf-ui";
 import {
@@ -42,7 +46,9 @@ export function ResultScreen() {
       title="Import complete"
       description={`Finished at ${IMPORT_RESULT.finishedAt}. The leads are in the ${WORKSPACE.name} workspace and ready to work.`}
     >
-      <div className="grid gap-4 sm:grid-cols-3">
+      <AssignmentSummary title="Assignment applied" showDistribution />
+
+      <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
         <ResultCard
           icon={CircleCheck}
           value={IMPORT_RESULT.imported}
@@ -58,13 +64,28 @@ export function ResultScreen() {
           tone="info"
         />
         <ResultCard
+          icon={UserX}
+          value={IMPORT_RESULT.needsAttention}
+          label="Needs attention"
+          caption="Held back for a decision"
+          tone="warning"
+        />
+        <ResultCard
           icon={XCircle}
-          value={IMPORT_RESULT.excluded}
-          label="Rows excluded"
+          value={IMPORT_RESULT.cannotImport}
+          label="Cannot import"
           caption="Listed in the error report"
           tone="danger"
         />
       </div>
+
+      <p className="text-xs leading-relaxed text-muted-foreground">
+        All {IMPORT_RESULT.sourceRows} rows in the file are accounted for:{" "}
+        {IMPORT_RESULT.imported} imported, {IMPORT_RESULT.skippedDuplicates}{" "}
+        skipped as duplicates, {IMPORT_RESULT.needsAttention} not imported
+        because they still need attention, and {IMPORT_RESULT.cannotImport} that
+        could not be imported. Nothing is omitted from this total.
+      </p>
 
       <div className="flex flex-wrap gap-2">
         {/* "View imported leads" has no Leads wireframe behind it, so it stays
@@ -169,11 +190,12 @@ function ResultCard({
   value: number;
   label: string;
   caption: string;
-  tone: "success" | "info" | "danger";
+  tone: "success" | "info" | "warning" | "danger";
 }) {
   const toneClass = {
     success: "bg-success-subtle text-success-on-subtle",
     info: "bg-info-subtle text-info-on-subtle",
+    warning: "bg-warning-subtle text-warning-on-subtle",
     danger: "bg-danger-subtle text-danger-on-subtle",
   }[tone];
 

@@ -11,19 +11,28 @@ import { Note, Panel } from "@/components/wireframes/wf-ui";
 import {
   MAPPED_ASSIGNMENT_COLUMN,
   MAPPED_ASSIGNMENT_FIELD,
-  PERSON_OPTIONS,
+  SALESPERSON_OPTIONS,
+  TEAM_LEAD_OPTIONS,
   TEAM_OPTIONS,
+  choiceProblem,
   choiceSummary,
   formatNames,
   getAssignmentChoice,
   getAssignmentServerChoice,
-  isChoiceComplete,
   setAssignmentChoice,
   subscribeToAssignmentChoice,
   teamOption,
   type AssignmentChoice,
   type AssignmentMethod,
+  type PersonOption,
 } from "@/lib/wireframes/import-assignment";
+import {
+  SALES_TEAMS,
+  managerOf,
+  nextAutomaticRecipients,
+  teamLeadOf,
+  userById,
+} from "@/lib/wireframes/sales-teams";
 import { cn } from "@/lib/utils";
 
 /**
@@ -34,13 +43,13 @@ import { cn } from "@/lib/utils";
  * Lead is written. Nothing here assigns anybody: the screen records one
  * choice and says what that choice will cause.
  *
- * The one idea the client needs to take away: a Sales Team is never the
- * Record Owner. A team is how the CRM finds a person — round robin selects an
- * eligible member, and if it cannot, the Lead waits in Assignment Required.
+ * The one idea the client needs to take away: a Team is never the Record
+ * Owner. A Team is how the CRM finds a person — that Team's one round-robin
+ * configuration selects an eligible member for each Lead.
  *
- * Nothing is preselected. The automatic-routing option is withheld until the
- * rule is confirmed with A&S Fincare, and none of the four that remain is a
- * safe default — so the admin chooses before Continue becomes available.
+ * §152 permits exactly three strategies and states there is no
+ * organization-wide default to fall back on, so nothing is preselected and
+ * Continue stays unavailable until a valid choice is made.
  */
 
 type Method = {
@@ -51,28 +60,22 @@ type Method = {
 
 const METHODS: readonly Method[] = [
   {
+    id: "team-lead",
+    title: "Assign to a specific Team Lead",
+    description:
+      "Every imported Lead receives the selected Team Lead as Record Owner. A direct assignment: no batch size applies.",
+  },
+  {
+    id: "salesperson",
+    title: "Assign to a specific Salesperson",
+    description:
+      "Every imported Lead receives the selected Salesperson as Record Owner. A direct assignment: no batch size applies.",
+  },
+  {
     id: "team",
-    title: "Distribute to a Sales Team",
+    title: "Assign to a Team",
     description:
-      "Select one team. Imported Leads will be distributed among its eligible members using that team's round-robin rule.",
-  },
-  {
-    id: "person",
-    title: "Assign all to one salesperson",
-    description:
-      "Every imported Lead receives the selected salesperson as Record Owner. This manual assignment does not change the round-robin rotation.",
-  },
-  {
-    id: "spreadsheet",
-    title: "Use assignments from the spreadsheet",
-    description:
-      "Use the mapped Team or Record Owner value on each row. Invalid, inactive or unknown values will appear during validation.",
-  },
-  {
-    id: "review",
-    title: "Leave assignment for review",
-    description:
-      "Import the Leads into Assignment Required so an authorized user can assign them later.",
+      "Imported Leads are distributed by that Team's one round-robin configuration, among the members currently in round robin.",
   },
 ];
 
@@ -95,8 +98,9 @@ function useAssignmentChoice(): [
 
 export function AssignmentScreen() {
   const [choice, update] = useAssignmentChoice();
-  const canContinue = isChoiceComplete(choice);
-  const selectedTeam = teamOption(choice.teamId);
+  const problem = choiceProblem(choice);
+  const canContinue = problem === null;
+  const blockedId = "import-assignment-blocked";
 
   return (
     <ImportShell
@@ -131,21 +135,22 @@ export function AssignmentScreen() {
                       />
                     ) : null}
 
-                    {method.id === "person" ? (
+                    {method.id === "team-lead" ? (
                       <PersonPicker
+                        kind="Team Lead"
+                        options={TEAM_LEAD_OPTIONS}
                         value={choice.userId}
                         onChange={(userId) => update({ userId })}
                       />
                     ) : null}
 
-                    {method.id === "spreadsheet" ? <SpreadsheetNote /> : null}
-
-                    {method.id === "review" ? (
-                      <Note icon={TriangleAlert} tone="warning">
-                        These Leads will not appear in an individual
-                        salesperson&rsquo;s work queue until somebody assigns
-                        them.
-                      </Note>
+                    {method.id === "salesperson" ? (
+                      <PersonPicker
+                        kind="Salesperson"
+                        options={SALESPERSON_OPTIONS}
+                        value={choice.userId}
+                        onChange={(userId) => update({ userId })}
+                      />
                     ) : null}
                   </MethodCard>
                 ))}
@@ -154,9 +159,11 @@ export function AssignmentScreen() {
           </Panel>
 
           <Note icon={Info}>
-            A Sales Team is never the Record Owner. A team decides which people
-            are in the rotation; round robin selects one of them for each Lead.
+            A Team is never the Record Owner. A Team decides which people are in
+            the rotation; round robin selects one of them for each Lead.
           </Note>
+
+          <MappedOwnerNote />
         </div>
 
         <div className="flex min-w-0 flex-col gap-4">
@@ -165,24 +172,19 @@ export function AssignmentScreen() {
               {choiceSummary(choice)}
             </p>
 
-            {choice.method === "team" &&
-            selectedTeam &&
-            selectedTeam.eligible.length === 0 ? (
-              <Note icon={TriangleAlert} tone="warning" className="mt-3">
-                This team currently has no eligible members. These Leads will
-                enter Assignment Required.
-              </Note>
-            ) : null}
-
             {/* Before a method is chosen the summary above already says so;
                 a second warning would only repeat it. */}
-            {choice.method !== null && !canContinue ? (
-              <p className="mt-3 rounded-lg border border-warning/30 bg-warning-subtle px-3 py-2.5 text-xs leading-relaxed text-warning-on-subtle">
-                {choice.method === "team"
-                  ? "Select a Sales Team to continue."
-                  : choice.method === "person"
-                    ? "Select a salesperson to continue."
-                    : "No Team or Record Owner column is mapped, so this method cannot be used."}
+            {choice.method !== null && problem ? (
+              <p
+                id={blockedId}
+                role="alert"
+                className="mt-3 rounded-lg border border-warning/30 bg-warning-subtle px-3 py-2.5 text-xs leading-relaxed text-warning-on-subtle"
+              >
+                <TriangleAlert
+                  className="me-1.5 inline size-3.5 align-[-2px]"
+                  aria-hidden="true"
+                />
+                {problem}
               </p>
             ) : null}
 
@@ -197,7 +199,11 @@ export function AssignmentScreen() {
                   </Link>
                 </Button>
               ) : (
-                <Button className="ms-auto" disabled>
+                <Button
+                  className="ms-auto"
+                  disabled
+                  aria-describedby={problem ? blockedId : undefined}
+                >
                   Continue to validation
                 </Button>
               )}
@@ -299,6 +305,9 @@ function TeamPicker({
   onChange: (id: string) => void;
 }) {
   const team = teamOption(value);
+  const detail = team ? SALES_TEAMS.find((t) => t.id === team.id) : undefined;
+  const lead = detail ? teamLeadOf(detail) : undefined;
+  const preview = detail ? nextAutomaticRecipients(detail, 6) : [];
 
   return (
     <div className="min-w-0">
@@ -306,7 +315,7 @@ function TeamPicker({
         htmlFor="import-assignment-team"
         className="mb-1.5 block text-xs font-medium text-foreground"
       >
-        Sales Team
+        Team
       </label>
       <select
         id="import-assignment-team"
@@ -314,83 +323,141 @@ function TeamPicker({
         onChange={(e) => onChange(e.target.value)}
         className={SELECT_CLASS}
       >
-        <option value="">Choose a team…</option>
+        <option value="">Choose a Team…</option>
         {TEAM_OPTIONS.map((t) => (
           <option key={t.id} value={t.id}>
-            {t.name} — {t.eligible.length} eligible member
-            {t.eligible.length === 1 ? "" : "s"}
+            {t.name} —{" "}
+            {t.eligible.length === 0
+              ? "no members in round robin"
+              : `${t.eligible.length} in round robin`}
           </option>
         ))}
       </select>
 
-      {team && team.eligible.length > 0 ? (
+      {team && detail ? (
+        <dl className="mt-2.5 grid gap-x-4 gap-y-1.5 text-xs sm:grid-cols-2">
+          <Row label="Team Lead">
+            {lead ? userById(lead.userId).name : "None"}
+          </Row>
+          <Row label="Reporting Manager">{managerOf(detail).name}</Row>
+          <Row label="Round-robin batch size">
+            <span className="tabular-nums">{team.batchSize}</span>
+          </Row>
+          <Row label="In round robin">
+            {team.eligible.length === 0 ? "None" : formatNames(team.eligible)}
+          </Row>
+          {team.paused.length > 0 ? (
+            <div className="sm:col-span-2">
+              <dt className="inline font-medium text-muted-foreground">
+                Excluded from automatic:
+              </dt>{" "}
+              <dd className="inline text-foreground">
+                {team.paused.join(", ")} — Paused from round robin. Still
+                available for direct assignment.
+              </dd>
+            </div>
+          ) : null}
+        </dl>
+      ) : null}
+
+      {team && team.viable ? (
         <Note icon={Users} className="mt-2.5">
-          Imported Leads will rotate between {formatNames(team.eligible)}.
+          Distribution preview:{" "}
+          {preview.map((id) => userById(id).name.split(" ")[0]).join(" → ")}
         </Note>
       ) : null}
 
-      {team && team.eligible.length === 0 ? (
+      {team && !team.viable ? (
         <Note icon={TriangleAlert} tone="warning" className="mt-2.5">
-          This team currently has no eligible members. These Leads will enter
-          Assignment Required.
+          No eligible automatic recipients. Every member is inactive or paused
+          from round robin, so this Team cannot be used for this import. Nothing
+          falls back to another Team, an Admin or a Manager.
         </Note>
       ) : null}
+    </div>
+  );
+}
+
+function Row({ label, children }: { label: string; children: ReactNode }) {
+  return (
+    <div className="min-w-0">
+      <dt className="inline font-medium text-muted-foreground">{label}:</dt>{" "}
+      <dd className="inline text-foreground">{children}</dd>
     </div>
   );
 }
 
 function PersonPicker({
+  kind,
+  options,
   value,
   onChange,
 }: {
+  kind: "Team Lead" | "Salesperson";
+  options: readonly PersonOption[];
   value: string;
   onChange: (id: string) => void;
 }) {
+  const id = `import-assignment-${kind.toLowerCase().replace(" ", "-")}`;
+  const selected = options.find((p) => p.id === value);
   return (
     <div className="min-w-0">
       <label
-        htmlFor="import-assignment-person"
+        htmlFor={id}
         className="mb-1.5 block text-xs font-medium text-foreground"
       >
-        Record Owner
+        {kind}
       </label>
       <select
-        id="import-assignment-person"
+        id={id}
         value={value}
         onChange={(e) => onChange(e.target.value)}
         className={SELECT_CLASS}
       >
-        <option value="">Choose a salesperson…</option>
-        {PERSON_OPTIONS.map((p) => (
+        <option value="">Choose a {kind}…</option>
+        {options.map((p) => (
           <option key={p.id} value={p.id}>
             {p.name}
             {p.teamName ? ` — ${p.teamName}` : ""}
+            {p.pausedFromRoundRobin ? " (paused from round robin)" : ""}
           </option>
         ))}
       </select>
+      <p className="mt-1.5 text-xs leading-relaxed text-muted-foreground">
+        Only active Team Leads and Salespersons within your scope are listed.
+        Inactive users, Admins and Managers are never eligible Record Owners.
+      </p>
+      {selected?.pausedFromRoundRobin ? (
+        <Note icon={Info} className="mt-2.5">
+          {selected.name} is paused from round robin. That withholds them from
+          automatic distribution only — a direct assignment like this one is
+          still permitted.
+        </Note>
+      ) : null}
     </div>
   );
 }
 
 /**
- * Option 4 reports the mapping as it actually stands rather than asserting
- * one, so it cannot contradict the Map columns screen beside it.
+ * §148: an eligible mapped Record Owner takes precedence for its own row.
+ * Reported as it actually stands, so it cannot contradict Map columns.
  */
-function SpreadsheetNote() {
+function MappedOwnerNote() {
   if (!MAPPED_ASSIGNMENT_COLUMN) {
     return (
       <Note tone="neutral">
-        No Team or Record Owner column is currently mapped. You can return to
-        column mapping to add one.
+        No Record Owner column is mapped, so every row will follow the strategy
+        chosen above.
       </Note>
     );
   }
-
   return (
     <Note icon={Info}>
       &ldquo;{MAPPED_ASSIGNMENT_COLUMN}&rdquo; is mapped to{" "}
-      {MAPPED_ASSIGNMENT_FIELD}. Values that do not match an active user are
-      reported during validation — import never creates a user.
+      {MAPPED_ASSIGNMENT_FIELD}. Where a row names an eligible active Team Lead
+      or Salesperson, that owner takes precedence over the strategy above for
+      that row. Rows whose owner cannot be matched are reported during
+      validation — never guessed, and never silently reassigned.
     </Note>
   );
 }

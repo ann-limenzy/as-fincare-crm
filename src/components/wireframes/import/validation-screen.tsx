@@ -14,6 +14,7 @@ import type { Route } from "next";
 import Link from "next/link";
 
 import { Button } from "@/components/ui/button";
+import { AssignmentSummary } from "@/components/wireframes/import/assignment-summary";
 import { ImportShell } from "@/components/wireframes/import/import-shell";
 import { Note, Panel, TableScroll } from "@/components/wireframes/wf-ui";
 import {
@@ -89,6 +90,8 @@ export function ValidationScreen() {
       title="Validation summary"
       description={`All ${VALIDATION_TOTALS.found} rows were checked against the CRM. Nothing has been written yet — this is what will happen if you continue.`}
     >
+      <AssignmentSummary title="Assignment to be applied" />
+
       <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
         {CATEGORIES.map((c) => {
           const Icon = c.icon;

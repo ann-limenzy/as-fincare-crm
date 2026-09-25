@@ -101,6 +101,14 @@ export const FLOWS: readonly Flow[] = [
         device: "desktop",
       },
       {
+        href: "/wireframes/import/process",
+        label: "Process",
+        title: "Import processing",
+        summary:
+          "Stage 7: records being created, and the assignment strategy being applied. Nothing here can re-run the import.",
+        device: "desktop",
+      },
+      {
         href: "/wireframes/import/result",
         label: "Result",
         title: "Import result and history",

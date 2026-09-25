@@ -281,7 +281,18 @@ export const VALIDATION_ISSUES: readonly ValidationIssue[] = [
     detail: "Executive: Joseph K",
     problem: "Unknown Record Owner",
     category: "attention",
-    actions: ["Map to an existing user", "Leave unassigned", "Edit row"],
+    /*
+     * The three choices §148 allows for an unmatched owner, and no fourth.
+     * The Step 3 fallback is an explicit decision here — it is never applied
+     * automatically, because that would silently replace the owner the file
+     * named.
+     */
+    actions: [
+      "Map to an eligible Team Lead or Salesperson",
+      "Apply the Step 3 assignment strategy",
+      "Leave unassigned",
+      "Edit row",
+    ],
   },
   {
     row: 112,
@@ -317,10 +328,29 @@ export const VALIDATION_ISSUES: readonly ValidationIssue[] = [
   },
 ];
 
+/**
+ * The outcome of the presented import, accounting for every source row.
+ *
+ * §160 requires the result to be verifiable against what was confirmed, so
+ * the four outcomes below sum to `sourceRows`. The two exclusion reasons are
+ * kept apart deliberately: 12 rows still need attention (§157 lists several
+ * reasons — invalid email, invalid date, unknown Lead Stage, unknown Record
+ * Owner) and 8 rows could not be imported at all. Reporting them as one
+ * "excluded" figure would hide which rows are recoverable.
+ */
 export const IMPORT_RESULT = {
+  /** Rows detected in the file — matches VALIDATION_TOTALS.found. */
+  sourceRows: 428,
   imported: 390,
   skippedDuplicates: 18,
-  excluded: 20,
+  /**
+   * Rows held back for a decision. Ties to VALIDATION_TOTALS.attention, and
+   * deliberately generic: the reasons vary per row and are not all owner
+   * problems.
+   */
+  needsAttention: 12,
+  /** Failed required-field validation and cannot be imported. */
+  cannotImport: 8,
   startedAt: "11 Sep 2026, 10:12 AM",
   finishedAt: "11 Sep 2026, 10:13 AM",
 } as const;
@@ -343,7 +373,8 @@ export const IMPORT_HISTORY: readonly ImportHistoryRow[] = [
     user: "Arun Menon",
     date: "11 Sep 2026",
     status: "Completed with errors",
-    result: "390 imported · 18 skipped · 20 excluded",
+    result:
+      "428 rows · 390 imported · 18 duplicates skipped · 12 not imported — needs attention · 8 cannot import",
   },
   {
     id: "h2",
