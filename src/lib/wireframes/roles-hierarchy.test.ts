@@ -56,8 +56,13 @@ const ROLES: readonly AppRole[] = [
 function operationalSeats(): readonly { where: string; who: string }[] {
   const seats: { where: string; who: string }[] = [];
   for (const c of CONVERSATIONS) {
-    if (c.assignedTo)
-      seats.push({ where: `conversation ${c.id}`, who: c.assignedTo });
+    // Conversations now hold a user id rather than a display name, so the
+    // seat is resolved through the hierarchy instead of compared by name.
+    if (c.assignedToUserId)
+      seats.push({
+        where: `conversation ${c.id}`,
+        who: userById(c.assignedToUserId).name,
+      });
   }
   for (const f of TODAY_FOLLOW_UPS) {
     seats.push({ where: `follow-up ${f.id}`, who: f.assignedTo });

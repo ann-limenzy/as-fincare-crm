@@ -16,11 +16,9 @@ import { PhoneFrame, PhoneScreen } from "@/components/wireframes/phone-frame";
 import { WireframeBrand } from "@/components/wireframes/wireframe-brand";
 import { Avatar } from "@/components/wireframes/wf-ui";
 import { DeliveryTag } from "@/components/wireframes/whatsapp/parts";
-import {
-  CONVERSATIONS,
-  SALES_PERSONA,
-  type Conversation,
-} from "@/lib/wireframes/mock-data";
+import { SALES_PERSONA, type Conversation } from "@/lib/wireframes/mock-data";
+import { USER, userById } from "@/lib/wireframes/sales-teams";
+import { visibleConversationsFor } from "@/lib/wireframes/whatsapp-access";
 import { cn } from "@/lib/utils";
 
 /**
@@ -32,8 +30,9 @@ import { cn } from "@/lib/utils";
  * Visibility follows spec §83: "Mine" is the conversations assigned to the
  * signed-in user, the Unassigned queue is reserved for Admins and Managers,
  * and a Salesperson has no automatic access to all conversations. So this
- * screen shows Sneha's own conversations and offers no route to anyone
- * else's — there is no All tab and no Unassigned tab on the phone.
+ * screen shows what `visibleConversationsFor` permits — Sneha's own and her
+ * team's, never the unassigned queue. There is no All tab and no Unassigned
+ * tab on the phone because her role could not use them.
  *
  * Ordering is operational rather than purely chronological, because the
  * question this screen answers is "what do I deal with first?". Nothing is
@@ -86,7 +85,9 @@ export function MobileInboxScreen() {
   const [query, setQuery] = useState("");
 
   const mine = useMemo(
-    () => CONVERSATIONS.filter((c) => c.assignedTo === SALES_PERSONA.name),
+    // The same predicate the desktop inbox uses. Sneha is a Team Lead, so
+    // this is her own plus her team's — and never the unassigned queue.
+    () => visibleConversationsFor(userById(USER.sneha)),
     [],
   );
 
@@ -215,9 +216,10 @@ export function MobileInboxScreen() {
               )}
 
               <p className="px-1 pb-1 text-[11px] leading-relaxed text-muted-foreground">
-                You see the conversations assigned to you. Unassigned and
-                team-wide conversations are handled by a manager or
-                administrator.
+                You see your own conversations and those assigned to
+                Salespersons in your team. The unassigned queue is not yours:
+                only an Admin or a Manager can see it, and only they can assign
+                a conversation to a Team Lead.
               </p>
             </div>
           </PhoneScreen>

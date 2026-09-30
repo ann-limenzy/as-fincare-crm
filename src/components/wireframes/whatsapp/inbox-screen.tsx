@@ -3,14 +3,24 @@
 import { ArrowRight, Inbox, Search, UserX } from "lucide-react";
 import type { Route } from "next";
 import Link from "next/link";
-import { useState } from "react";
+import { useState, useSyncExternalStore } from "react";
 
 import { CrmChrome } from "@/components/wireframes/crm-chrome";
 import { ChannelMark } from "@/components/wireframes/whatsapp/parts";
 import { DeliveryTag } from "@/components/wireframes/whatsapp/parts";
 import { Avatar, ScreenHeading } from "@/components/wireframes/wf-ui";
 import { Button } from "@/components/ui/button";
-import { CONVERSATIONS, CURRENT_USER } from "@/lib/wireframes/mock-data";
+import { CONVERSATIONS } from "@/lib/wireframes/mock-data";
+import { USER, userById } from "@/lib/wireframes/sales-teams";
+import {
+  maySeeUnassignedQueue,
+  visibleConversationsFor,
+} from "@/lib/wireframes/whatsapp-access";
+import {
+  getConversationServerState,
+  getConversationState,
+  subscribeToConversations,
+} from "@/lib/wireframes/whatsapp-store";
 import { cn } from "@/lib/utils";
 
 /**
@@ -32,27 +42,32 @@ const FILTERS = [
 
 type FilterId = (typeof FILTERS)[number]["id"];
 
-/**
- * The desktop conversation wireframe shows one specific thread. Opening it
- * from any other row would put the client in Ramesh Kumar's conversation
- * after clicking Priya Iyer, so only the matching row navigates; the rest
- * select in place and say so.
- */
-const BUILT_OUT_CONVERSATION = "w1";
-
 export function InboxScreen() {
   const [filter, setFilter] = useState<FilterId>("all");
-  const [selected, setSelected] = useState(CONVERSATIONS[0]!.id);
 
-  const visible = CONVERSATIONS.filter((c) => {
+  // Presented as the Admin. The list is what the shared predicate permits,
+  // never the raw mock array — a Team Lead or Salesperson opening this same
+  // component sees only their own scope and no unassigned queue at all.
+  const viewer = userById(USER.arun);
+  const store = useSyncExternalStore(
+    subscribeToConversations,
+    getConversationState,
+    getConversationServerState,
+  );
+  // Derived from store state, so the Unassigned count falls by itself once a
+  // conversation has been assigned — nothing about it is hardcoded.
+  const permitted = visibleConversationsFor(viewer, store.conversations);
+  const showUnassigned = maySeeUnassignedQueue(viewer);
+  const [selected, setSelected] = useState(permitted[0]?.id ?? "");
+
+  const visible = permitted.filter((c) => {
     switch (filter) {
       case "mine":
-        // The desktop inbox is presented as an Admin, and §2.5 forbids a
-        // supervisor from being a conversation assignee — so this tab is
-        // correctly empty here. Batch 4 gives WhatsApp its full role model.
-        return c.assignedTo === CURRENT_USER.name;
+        // §93 forbids a supervisor from ever being an assignee, so an Admin
+        // correctly has none of their own.
+        return c.assignedToUserId === viewer.id;
       case "unassigned":
-        return c.assignedTo === null;
+        return c.assignedToUserId === null;
       case "unread":
         return c.unread > 0;
       case "open":
@@ -64,7 +79,10 @@ export function InboxScreen() {
     }
   });
 
-  const active = CONVERSATIONS.find((c) => c.id === selected) ?? visible[0];
+  // The detail pane must show a row that is actually in the filtered list.
+  // Otherwise selecting Unassigned would keep the previous conversation on
+  // screen, and Open conversation would link to the wrong thread.
+  const active = visible.find((c) => c.id === selected) ?? visible[0] ?? null;
 
   return (
     <CrmChrome active="whatsapp">
@@ -82,8 +100,16 @@ export function InboxScreen() {
                 <span className="truncate">Search name or phone number</span>
               </div>
 
-              <div className="mt-2.5 flex flex-wrap gap-1.5">
-                {FILTERS.map((f) => (
+              <div
+                role="group"
+                aria-label="Filter conversations"
+                className="mt-2.5 flex flex-wrap gap-1.5"
+              >
+                {FILTERS.filter(
+                  // §89.1: Team Leads and Salespersons never see the queue,
+                  // so the tab is absent rather than empty for them.
+                  (f) => f.id !== "unassigned" || showUnassigned,
+                ).map((f) => (
                   <button
                     key={f.id}
                     type="button"
@@ -140,9 +166,9 @@ export function InboxScreen() {
                           {c.lastMessage}
                         </span>
                         <span className="mt-1.5 flex flex-wrap items-center gap-1.5">
-                          {c.assignedTo ? (
+                          {c.assignedToUserId ? (
                             <span className="truncate rounded-full bg-muted px-2 py-0.5 text-[11px] text-muted-foreground">
-                              {c.assignedTo}
+                              {userById(c.assignedToUserId).name}
                             </span>
                           ) : (
                             <span className="inline-flex items-center gap-1 rounded-full border border-warning/30 bg-warning-subtle px-2 py-0.5 text-[11px] font-medium text-warning-on-subtle">
@@ -203,7 +229,11 @@ export function InboxScreen() {
                 <Fact label="Product" value={active.product} />
                 <Fact
                   label="Assigned to"
-                  value={active.assignedTo ?? "Unassigned"}
+                  value={
+                    active.assignedToUserId
+                      ? userById(active.assignedToUserId).name
+                      : "Unassigned"
+                  }
                 />
                 <Fact label="Status" value={active.status} />
               </dl>
@@ -215,20 +245,21 @@ export function InboxScreen() {
                 {active.lastMessage}
               </p>
 
-              {active.id === BUILT_OUT_CONVERSATION ? (
-                <Button asChild className="mt-5">
-                  <Link href={"/wireframes/whatsapp/conversation" as Route}>
-                    Open conversation
-                    <ArrowRight className="size-4" aria-hidden="true" />
-                  </Link>
-                </Button>
-              ) : (
-                <p className="mt-5 text-xs leading-relaxed text-muted-foreground">
-                  Selecting a conversation opens the full thread. This
-                  walkthrough builds out {CONVERSATIONS[0]!.person}&apos;s
-                  conversation — select that row to open it.
-                </p>
-              )}
+              {/*
+                Every row opens its OWN conversation, so the Unassigned queue
+                reaches the unknown-number thread rather than landing on the
+                built-out one.
+              */}
+              <Button asChild className="mt-5">
+                <Link
+                  href={
+                    `/wireframes/whatsapp/conversation?conversation=${active.id}` as Route
+                  }
+                >
+                  Open conversation
+                  <ArrowRight className="size-4" aria-hidden="true" />
+                </Link>
+              </Button>
             </section>
           ) : null}
         </div>

@@ -91,9 +91,9 @@ const STATES: readonly State[] = [
     id: "needs-assignment",
     icon: UserX,
     tone: "warning",
-    title: "This conversation has no owner",
+    title: "This conversation is unassigned",
     who: "Seen by Manager and Admin",
-    body: "An unassigned conversation is the one that goes unanswered. Assign it to a salesperson before replying so the follow-up lands with someone.",
+    body: "Nobody can reply while a conversation is unassigned — Admins and Managers included, even though they are the only roles who can see it. An Admin or Manager must assign it to an active Team Lead first; the composer appears only after that.",
     actions: [
       { label: "Assign to me", primary: true },
       { label: "Assign to someone else" },

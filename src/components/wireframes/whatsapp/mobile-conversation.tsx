@@ -36,11 +36,12 @@ import {
 import { DeliveryTag } from "@/components/wireframes/whatsapp/parts";
 import {
   CONVERSATIONS,
-  SALES_PERSONA,
   FOLLOW_UP_TYPES,
-  TEAM,
+  SALES_PERSONA,
   THREAD,
 } from "@/lib/wireframes/mock-data";
+import { USER, activeTeamOf, userById } from "@/lib/wireframes/sales-teams";
+import { reassignmentTargetsFor } from "@/lib/wireframes/whatsapp-access";
 import { cn } from "@/lib/utils";
 
 /**
@@ -312,14 +313,14 @@ function MoreSheet({
           onClick={onAddNote}
         />
         {/*
-         * Spec §162 permission matrix: "Assign WhatsApp conversations" is
-         * Yes for Admin, Configurable for Manager, No for a Salesperson.
-         * This is the salesperson's phone, so it is not theirs to do.
+         * §93: a Team Lead may reassign only within their own team. Sneha
+         * leads the Health Insurance Team, so the capability is hers — and
+         * its scope is stated rather than left to be assumed.
          */}
         <SheetInactive
           icon={UserCog}
-          label="Assign conversation"
-          reason="Managers and admins only"
+          label="Reassign conversation"
+          reason={`Within ${activeTeamOf(USER.sneha)?.name} only`}
         />
         {/*
          * Spec §112 names closing/reopening as its own permission, but the
@@ -388,8 +389,15 @@ function FollowUpSheet({
             </select>
           </SheetField>
           <SheetField label="Assigned to">
+            {/*
+              Scoped to this Team Lead's own team (§2.3). Listing every
+              operational user would expose peers she cannot see.
+            */}
             <select defaultValue={SALES_PERSONA.name} className={FIELD_CLASS}>
-              {TEAM.map((m) => (
+              {reassignmentTargetsFor(
+                userById(USER.sneha),
+                CONVERSATIONS[0]!,
+              ).map((m) => (
                 <option key={m.id}>{m.name}</option>
               ))}
             </select>

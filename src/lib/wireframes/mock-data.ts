@@ -419,7 +419,15 @@ export type Conversation = {
   product: string;
   lastMessage: string;
   time: string;
-  assignedTo: string | null;
+  /**
+   * SETTINGS_USERS id of the Team Lead or Salesperson in Assigned To, or
+   * null while the conversation is Unassigned (§93).
+   *
+   * An id rather than a display name, so authorization is never decided by
+   * comparing what happens to be printed on screen. Admins and Managers can
+   * never appear here, by any route (§93).
+   */
+  assignedToUserId: string | null;
   status: "Open" | "Closed";
   unread: number;
   delivery: DeliveryState;
@@ -443,7 +451,7 @@ export const CONVERSATIONS: readonly Conversation[] = [
     product: "Health Insurance",
     lastMessage: "Yes, please renew it",
     time: "10:32 AM",
-    assignedTo: "Sneha Thomas",
+    assignedToUserId: "s3", // Sneha Thomas
     status: "Open",
     unread: 2,
     delivery: "read",
@@ -458,7 +466,7 @@ export const CONVERSATIONS: readonly Conversation[] = [
     product: "Health Insurance",
     lastMessage: "Can you send the premium for the family plan?",
     time: "9:58 AM",
-    assignedTo: "Sneha Thomas",
+    assignedToUserId: "s3", // Sneha Thomas
     status: "Open",
     unread: 1,
     delivery: "read",
@@ -473,7 +481,7 @@ export const CONVERSATIONS: readonly Conversation[] = [
     product: "Health Insurance",
     lastMessage: "Sending the revised quote now",
     time: "9:20 AM",
-    assignedTo: "Sneha Thomas",
+    assignedToUserId: "s3", // Sneha Thomas
     status: "Open",
     unread: 0,
     delivery: "failed",
@@ -488,7 +496,7 @@ export const CONVERSATIONS: readonly Conversation[] = [
     product: "Motor Insurance",
     lastMessage: "Renewal reminder sent for 20 September",
     time: "Yesterday",
-    assignedTo: "Sneha Thomas",
+    assignedToUserId: "s3", // Sneha Thomas
     status: "Open",
     unread: 0,
     delivery: "delivered",
@@ -508,7 +516,7 @@ export const CONVERSATIONS: readonly Conversation[] = [
     product: "Health Insurance",
     lastMessage: "Thank you, received the quote comparison",
     time: "9:45 AM",
-    assignedTo: "Sneha Thomas",
+    assignedToUserId: "s3", // Sneha Thomas
     status: "Open",
     unread: 0,
     delivery: "read",
@@ -523,7 +531,7 @@ export const CONVERSATIONS: readonly Conversation[] = [
     product: "PUC Certificate",
     lastMessage: "Shared the checklist of documents to bring",
     time: "Yesterday",
-    assignedTo: "Sneha Thomas",
+    assignedToUserId: "s3", // Sneha Thomas
     status: "Open",
     unread: 0,
     delivery: "read",
@@ -538,7 +546,7 @@ export const CONVERSATIONS: readonly Conversation[] = [
     product: "Motor Insurance",
     lastMessage: "Renewal completed, thank you for the help",
     time: "09 Sep",
-    assignedTo: "Sneha Thomas",
+    assignedToUserId: "s3", // Sneha Thomas
     status: "Closed",
     unread: 0,
     delivery: "read",
@@ -553,7 +561,7 @@ export const CONVERSATIONS: readonly Conversation[] = [
     product: "—",
     lastMessage: "I need more details about motor insurance",
     time: "9:12 AM",
-    assignedTo: null,
+    assignedToUserId: null,
     status: "Open",
     unread: 1,
     delivery: "delivered",
@@ -568,7 +576,7 @@ export const CONVERSATIONS: readonly Conversation[] = [
     product: "PUC Certificate",
     lastMessage: "Document request sent",
     time: "Yesterday",
-    assignedTo: "Neha Thomas",
+    assignedToUserId: "s4", // Neha Thomas
     status: "Open",
     unread: 0,
     delivery: "failed",
@@ -583,7 +591,7 @@ export const CONVERSATIONS: readonly Conversation[] = [
     product: "Motor Insurance",
     lastMessage: "Can you share the quote again?",
     time: "Yesterday",
-    assignedTo: "Kavya Raghavan",
+    assignedToUserId: "s10", // Kavya Raghavan
     status: "Open",
     unread: 0,
     delivery: "read",
@@ -598,7 +606,7 @@ export const CONVERSATIONS: readonly Conversation[] = [
     product: "Motor Insurance",
     lastMessage: "Renewal completed. Thanks for your help.",
     time: "09 Sep",
-    assignedTo: "Ajay Varma",
+    assignedToUserId: "s8", // Ajay Varma
     status: "Closed",
     unread: 0,
     delivery: "read",
