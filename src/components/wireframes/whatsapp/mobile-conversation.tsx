@@ -16,7 +16,7 @@ import {
 } from "lucide-react";
 import type { Route } from "next";
 import Link from "next/link";
-import { useState } from "react";
+import { useState, useSyncExternalStore } from "react";
 
 import {
   CallHandoffSheet,
@@ -38,10 +38,23 @@ import {
   CONVERSATIONS,
   FOLLOW_UP_TYPES,
   SALES_PERSONA,
-  THREAD,
 } from "@/lib/wireframes/mock-data";
 import { USER, activeTeamOf, userById } from "@/lib/wireframes/sales-teams";
 import { reassignmentTargetsFor } from "@/lib/wireframes/whatsapp-access";
+import {
+  checkSend,
+  composerStateFor,
+  mayRetry,
+  retryInFlight,
+} from "@/lib/wireframes/whatsapp-messaging";
+import {
+  getConversationServerState,
+  getConversationState,
+  messagesFor,
+  retryMessage,
+  sendMessage,
+  subscribeToConversations,
+} from "@/lib/wireframes/whatsapp-store";
 import { cn } from "@/lib/utils";
 
 /**
@@ -66,9 +79,45 @@ type SheetKind = "call" | "followup" | "note" | "more";
 type Confirmation = "followup" | "note";
 
 export function MobileConversationScreen() {
-  const conversation = CONVERSATIONS[0]!;
+  const store = useSyncExternalStore(
+    subscribeToConversations,
+    getConversationState,
+    getConversationServerState,
+  );
+  const seed = CONVERSATIONS[0]!;
+  const conversation =
+    store.conversations.find((c) => c.id === seed.id) ?? seed;
   const [sheet, setSheet] = useState<SheetKind | null>(null);
   const [confirmed, setConfirmed] = useState<Confirmation | null>(null);
+  const [draft, setDraft] = useState("");
+  const [refusal, setRefusal] = useState<string | null>(null);
+
+  // Signed in as the Team Lead who holds this conversation. The composer comes
+  // from the same helper the desktop screen uses, so the phone can never offer
+  // a send the desktop would refuse — or the other way round.
+  const viewer = userById(USER.sneha);
+  const composer = composerStateFor(viewer, conversation);
+  const thread = messagesFor(conversation.id, store);
+  const sendCheck = checkSend(viewer, conversation, {
+    text: draft,
+    templateId: null,
+    purchaseId: null,
+  });
+
+  const send = () => {
+    const check = checkSend(viewer, conversation, {
+      text: draft,
+      templateId: null,
+      purchaseId: null,
+    });
+    if (!check.ok) {
+      setRefusal(check.reason);
+      return;
+    }
+    sendMessage(conversation.id, check);
+    setDraft("");
+    setRefusal(null);
+  };
 
   const close = () => {
     setSheet(null);
@@ -150,7 +199,7 @@ export function MobileConversationScreen() {
               <p className="text-center text-[11px] font-medium text-muted-foreground">
                 Today
               </p>
-              {THREAD.map((m) => {
+              {thread.map((m) => {
                 const outgoing = m.direction === "out";
                 const failed = m.delivery === "failed";
                 return (
@@ -190,16 +239,32 @@ export function MobileConversationScreen() {
                             {m.time}
                           </span>
                         )}
-                        {failed ? (
+                        {mayRetry(thread, m.id) ? (
                           <button
                             type="button"
+                            onClick={() => retryMessage(conversation.id, m.id)}
                             className="inline-flex min-h-11 items-center gap-1 text-[11px] font-medium text-primary underline underline-offset-2"
                           >
                             <RotateCcw className="size-3" aria-hidden="true" />
                             Retry
                           </button>
+                        ) : failed && retryInFlight(thread, m.id) ? (
+                          <span className="text-[11px] text-muted-foreground">
+                            Retry in progress
+                          </span>
                         ) : null}
                       </div>
+                      {m.retryOf ? (
+                        <p className="mt-1 text-[11px] text-muted-foreground">
+                          Retry of the earlier failed message
+                        </p>
+                      ) : null}
+                      {failed ? (
+                        <p className="mt-1 text-[11px] font-medium text-danger-on-subtle">
+                          Not delivered
+                          {m.failureReason ? ` — ${m.failureReason}` : ""}
+                        </p>
+                      ) : null}
                     </div>
                   </div>
                 );
@@ -227,25 +292,93 @@ export function MobileConversationScreen() {
                 />
               </div>
 
-              <div className="flex items-end gap-2 p-2.5">
-                <Link
-                  href={"/wireframes/whatsapp/templates" as Route}
-                  aria-label="Choose a message template"
-                  className="grid size-11 shrink-0 place-items-center rounded-lg border border-border text-muted-foreground"
-                >
-                  <FileText className="size-5" aria-hidden="true" />
-                </Link>
-                <div className="min-h-11 min-w-0 flex-1 rounded-lg border border-input bg-background px-3 py-3 text-[13px] text-muted-foreground">
-                  Message
+              {/*
+                The same three composer modes as the desktop screen, from the
+                same helper: free text, template only, or nothing at all.
+              */}
+              {composer.mode === "messaging-blocked" ? (
+                <div className="p-2.5">
+                  <p
+                    role="note"
+                    aria-label="Messaging unavailable"
+                    className="rounded-lg border border-border-strong/40 bg-neutral-subtle px-3 py-2.5 text-[12px] leading-relaxed text-neutral-on-subtle"
+                  >
+                    <strong className="font-semibold">
+                      {composer.heading}
+                    </strong>{" "}
+                    {composer.explanation}
+                  </p>
                 </div>
-                <button
-                  type="button"
-                  aria-label="Send message"
-                  className="grid size-11 shrink-0 place-items-center rounded-lg bg-primary text-primary-foreground"
-                >
-                  <Send className="size-5" aria-hidden="true" />
-                </button>
-              </div>
+              ) : composer.mode === "unassigned" ||
+                composer.mode === "not-permitted" ? (
+                <div className="p-2.5">
+                  <p
+                    role="note"
+                    aria-label="Reply unavailable"
+                    className="rounded-lg border border-warning/30 bg-warning-subtle px-3 py-2.5 text-[12px] leading-relaxed text-warning-on-subtle"
+                  >
+                    <strong className="font-semibold">
+                      {composer.heading}
+                    </strong>{" "}
+                    {composer.explanation}
+                  </p>
+                </div>
+              ) : (
+                <>
+                  {composer.requiresTemplate ? (
+                    <p
+                      role="note"
+                      aria-label="Approved template required"
+                      className="border-b border-border/70 bg-info-subtle px-3 py-2 text-[11px] leading-relaxed text-info-on-subtle"
+                    >
+                      <strong className="font-semibold">
+                        {composer.heading}
+                      </strong>{" "}
+                      {composer.explanation}
+                    </p>
+                  ) : null}
+                  <div className="flex items-end gap-2 p-2.5">
+                    <Link
+                      href={"/wireframes/whatsapp/templates" as Route}
+                      aria-label="Choose a message template"
+                      className="grid size-11 shrink-0 place-items-center rounded-lg border border-border text-muted-foreground"
+                    >
+                      <FileText className="size-5" aria-hidden="true" />
+                    </Link>
+                    {composer.mayType ? (
+                      <textarea
+                        rows={1}
+                        aria-label="Message"
+                        placeholder="Message"
+                        value={draft}
+                        onChange={(e) => {
+                          setDraft(e.target.value);
+                          setRefusal(null);
+                        }}
+                        className="min-h-11 min-w-0 flex-1 resize-none rounded-lg border border-input bg-background px-3 py-3 text-[13px] text-foreground"
+                      />
+                    ) : (
+                      <p className="min-h-11 min-w-0 flex-1 rounded-lg border border-input bg-background px-3 py-3 text-[12px] leading-snug text-muted-foreground">
+                        Template only — tap the template button
+                      </p>
+                    )}
+                    <button
+                      type="button"
+                      aria-label="Send message"
+                      onClick={send}
+                      disabled={!sendCheck.ok}
+                      className="grid size-11 shrink-0 place-items-center rounded-lg bg-primary text-primary-foreground disabled:opacity-50"
+                    >
+                      <Send className="size-5" aria-hidden="true" />
+                    </button>
+                  </div>
+                  {refusal ? (
+                    <p className="px-3 pb-2.5 text-[11px] leading-relaxed text-muted-foreground">
+                      {refusal}
+                    </p>
+                  ) : null}
+                </>
+              )}
             </div>
           </PhoneScreen>
         </PhoneFrame>

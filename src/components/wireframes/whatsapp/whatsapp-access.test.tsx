@@ -67,7 +67,9 @@ describe("Unassigned conversation renders read-only (§93.1)", () => {
   it("renders the composer again for an assigned conversation", () => {
     render(<ConversationScreen conversationId={assigned.id} />);
     expect(screen.getByRole("button", { name: /^Send$/ })).toBeInTheDocument();
-    expect(screen.getByText("Write a reply…")).toBeInTheDocument();
+    // Batch 3B turned the placeholder div into a real field, so the reply box
+    // is now found by its label rather than by its text.
+    expect(screen.getByLabelText("Write a reply")).toBeInTheDocument();
     expect(screen.queryByText("Unassigned")).toBeNull();
   });
 

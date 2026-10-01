@@ -410,6 +410,264 @@ export const IMPORT_HISTORY: readonly ImportHistoryRow[] = [
 export type DeliveryState =
   "sending" | "sent" | "delivered" | "read" | "failed";
 
+/**
+ * The messaging state the connected WhatsApp integration reports for this
+ * contact (§96, §104, §114).
+ *
+ * §96 is explicit that "the CRM should use the messaging eligibility/state
+ * returned by the WhatsApp integration rather than asking users to understand
+ * WhatsApp platform rules themselves", so this is a value the integration
+ * supplies — never something the CRM works out from a clock. The
+ * specification defines no time window anywhere, and none is invented here:
+ * whatever rule the platform applies, the CRM reads the outcome.
+ *
+ * `free-form`        — §96 "normal reply/free-form messaging is allowed"
+ * `template-required`— §96 "an approved/eligible template is required"
+ * `unavailable`      — §114 "WhatsApp messaging unavailable"
+ * `opted-out`        — §114 "Customer opted out"
+ */
+export type MessagingEligibility =
+  "free-form" | "template-required" | "unavailable" | "opted-out";
+
+/* ------------------------------------------- linked Lead / Customer record */
+
+/**
+ * One Customer Purchase, as the §98 template variables need it.
+ *
+ * Product Category, Provider and Plan / Sub-product are three separate §98
+ * variables, so they are three separate fields. A single `product` string
+ * cannot serve all three, and collapsing them would make it impossible to say
+ * which one a template asked for.
+ */
+export type LinkedPurchase = {
+  readonly id: string;
+  /** §98 "Product Category". */
+  readonly productCategory: string;
+  /** §98 "Provider". */
+  readonly provider: string;
+  /** §98 "Plan / Sub-product". */
+  readonly planSubProduct: string;
+  /** §98 "Policy or Reference Number". Obviously fictional. */
+  readonly policyReference: string;
+  /** §98 "Renewal Date". */
+  readonly renewalDate: string;
+};
+
+/**
+ * The Lead or Customer a conversation is linked to.
+ *
+ * §98 requires that "variables resolve only from the recipient's own record"
+ * and that "a template must never be able to pull data from a record outside
+ * the sending user's permitted scope". That is only enforceable if there is
+ * one explicit link per conversation and the owner is an id: a display name
+ * would have to be matched against something, and matching names is how the
+ * wrong record gets read.
+ */
+export type LinkedRecord = {
+  readonly id: string;
+  readonly kind: "Lead" | "Customer";
+  /**
+   * The person's name on THIS record. §98 keeps Customer Name and Lead Name
+   * apart, so which variable this answers depends on `kind`.
+   */
+  readonly name: string;
+  readonly reference: string;
+  /**
+   * SETTINGS_USERS id of the Record Owner — never a display name, and never
+   * the conversation assignee unless they genuinely are the owner.
+   */
+  readonly recordOwnerUserId: string;
+  /**
+   * §98 "Product Category" for a Lead, which is an attribute of the enquiry
+   * rather than of a purchase. A Customer resolves it from the applicable
+   * Customer Purchase instead, so this is absent on Customer records.
+   */
+  readonly productCategory?: string;
+  /**
+   * Customer Purchases on this record. Empty for a Lead, which has no policy
+   * and therefore no policy reference or renewal date to resolve.
+   */
+  readonly purchases: readonly LinkedPurchase[];
+};
+
+/**
+ * Linked records for the WhatsApp conversations.
+ *
+ * Ramesh deliberately carries TWO purchases, matching his own customer
+ * screen, so the "which policy is this about?" case is real rather than
+ * hypothetical. His Record Owner is Neha Thomas while his conversation is
+ * assigned to Sneha Thomas — the two are different jobs, and a template must
+ * name the owner rather than whoever happens to be replying.
+ */
+export const LINKED_RECORDS: readonly LinkedRecord[] = [
+  {
+    id: "c881",
+    kind: "Customer",
+    name: "Ramesh Kumar",
+    reference: "Customer · #881",
+    recordOwnerUserId: "s4", // Neha Thomas — not the assignee
+    purchases: [
+      {
+        id: "c881-a",
+        productCategory: "Health Insurance",
+        provider: "Star Health",
+        planSubProduct: "Family Health Optima",
+        policyReference: "POL-TEST-881-A",
+        renewalDate: "26 September 2026",
+      },
+      {
+        id: "c881-b",
+        productCategory: "Motor Insurance",
+        provider: "Shield General (sample provider)",
+        planSubProduct: "Private Car Comprehensive",
+        policyReference: "POL-TEST-881-B",
+        renewalDate: "11 January 2027",
+      },
+    ],
+  },
+  {
+    id: "c904",
+    kind: "Customer",
+    name: "Vikram Reddy",
+    reference: "Customer · #904",
+    // Kavya is in the Motor Insurance Team, so this record sits outside a
+    // Health Team Lead's scope even though the conversation does not.
+    recordOwnerUserId: "s10", // Kavya Raghavan
+    purchases: [
+      {
+        id: "c904-a",
+        productCategory: "Motor Insurance",
+        provider: "Shield General (sample provider)",
+        planSubProduct: "Private Car Comprehensive",
+        policyReference: "POL-TEST-904-A",
+        renewalDate: "20 September 2026",
+      },
+    ],
+  },
+  {
+    id: "c712",
+    kind: "Customer",
+    name: "Sneha Nair",
+    reference: "Customer · #712",
+    recordOwnerUserId: "s3", // Sneha Thomas
+    purchases: [
+      {
+        id: "c712-a",
+        productCategory: "PUC Certificate",
+        provider: "Authorised Testing Centre (sample)",
+        planSubProduct: "Private Car PUC",
+        policyReference: "PUC-TEST-712-A",
+        renewalDate: "02 October 2026",
+      },
+    ],
+  },
+  {
+    id: "c688",
+    kind: "Customer",
+    name: "Fathima Rasheed",
+    reference: "Customer · #688",
+    recordOwnerUserId: "s3", // Sneha Thomas
+    purchases: [
+      {
+        id: "c688-a",
+        productCategory: "Motor Insurance",
+        provider: "Shield General (sample provider)",
+        planSubProduct: "Two Wheeler Comprehensive",
+        policyReference: "POL-TEST-688-A",
+        renewalDate: "09 September 2027",
+      },
+    ],
+  },
+  {
+    id: "c517",
+    kind: "Customer",
+    name: "Suresh Pillai",
+    reference: "Customer · #517",
+    recordOwnerUserId: "s4", // Neha Thomas
+    purchases: [
+      {
+        id: "c517-a",
+        productCategory: "PUC Certificate",
+        provider: "Authorised Testing Centre (sample)",
+        planSubProduct: "Private Car PUC",
+        policyReference: "PUC-TEST-517-A",
+        renewalDate: "18 September 2026",
+      },
+    ],
+  },
+  {
+    id: "c733",
+    kind: "Customer",
+    name: "Farhan Ali",
+    reference: "Customer · #733",
+    recordOwnerUserId: "s8", // Ajay Varma
+    purchases: [
+      {
+        id: "c733-a",
+        productCategory: "Motor Insurance",
+        provider: "Shield General (sample provider)",
+        planSubProduct: "Private Car Comprehensive",
+        policyReference: "POL-TEST-733-A",
+        renewalDate: "09 September 2027",
+      },
+    ],
+  },
+  // Leads. No Customer Purchase exists yet, so §98's policy reference and
+  // renewal date genuinely have nothing to resolve from — which is why a
+  // renewal template is not offered on a Lead conversation.
+  {
+    id: "l2088",
+    kind: "Lead",
+    name: "Priya Iyer",
+    reference: "Lead · #2088",
+    recordOwnerUserId: "s3", // Sneha Thomas
+    productCategory: "Health Insurance",
+    purchases: [],
+  },
+  {
+    id: "l2041",
+    kind: "Lead",
+    name: "Meera Krishnan",
+    reference: "Lead · #2041",
+    recordOwnerUserId: "s3",
+    productCategory: "Health Insurance",
+    purchases: [],
+  },
+  {
+    id: "l2107",
+    kind: "Lead",
+    name: "Rajesh Menon",
+    reference: "Lead · #2107",
+    recordOwnerUserId: "s3",
+    productCategory: "Health Insurance",
+    purchases: [],
+  },
+  {
+    id: "l2044",
+    kind: "Lead",
+    name: "Anitha Desai",
+    reference: "Lead · #2044",
+    recordOwnerUserId: "s10", // Kavya Raghavan
+    productCategory: "Motor Insurance",
+    purchases: [],
+  },
+];
+
+export function linkedRecordById(id: string): LinkedRecord | undefined {
+  return LINKED_RECORDS.find((r) => r.id === id);
+}
+
+/**
+ * A&S Fincare's own details, for §98's business-name and contact variables.
+ *
+ * A reserved test number and a reserved `.example` domain: neither reaches
+ * anybody, and no credential or environment value appears here.
+ */
+export const BUSINESS = {
+  name: WORKSPACE.name,
+  contactDetails: "70000 00000 · help@asfincare.example",
+} as const;
+
 export type Conversation = {
   id: string;
   person: string;
@@ -431,6 +689,17 @@ export type Conversation = {
   status: "Open" | "Closed";
   unread: number;
   delivery: DeliveryState;
+  /**
+   * What the integration currently permits on this conversation (§96).
+   * Stored per conversation rather than derived, because the CRM is a reader
+   * of this state and not its author.
+   */
+  messagingEligibility: MessagingEligibility;
+  /**
+   * The one Lead or Customer this conversation resolves template variables
+   * from (§98), or null for an unknown number with no record at all.
+   */
+  linkedRecordId: string | null;
   /**
    * Who spoke last. Together with `unread` it is what separates a
    * conversation still waiting on the customer from one waiting on us —
@@ -455,6 +724,8 @@ export const CONVERSATIONS: readonly Conversation[] = [
     status: "Open",
     unread: 2,
     delivery: "read",
+    messagingEligibility: "free-form",
+    linkedRecordId: "c881",
     lastDirection: "in",
   },
   {
@@ -470,6 +741,8 @@ export const CONVERSATIONS: readonly Conversation[] = [
     status: "Open",
     unread: 1,
     delivery: "read",
+    messagingEligibility: "free-form",
+    linkedRecordId: "l2041",
     lastDirection: "in",
   },
   {
@@ -485,6 +758,8 @@ export const CONVERSATIONS: readonly Conversation[] = [
     status: "Open",
     unread: 0,
     delivery: "failed",
+    messagingEligibility: "template-required",
+    linkedRecordId: "l2107",
     lastDirection: "out",
   },
   {
@@ -500,6 +775,8 @@ export const CONVERSATIONS: readonly Conversation[] = [
     status: "Open",
     unread: 0,
     delivery: "delivered",
+    messagingEligibility: "template-required",
+    linkedRecordId: "c904",
     lastDirection: "out",
     followUpDue: "Follow-up due today, 4:00 PM",
   },
@@ -520,6 +797,8 @@ export const CONVERSATIONS: readonly Conversation[] = [
     status: "Open",
     unread: 0,
     delivery: "read",
+    messagingEligibility: "opted-out",
+    linkedRecordId: "l2088",
     lastDirection: "in",
   },
   {
@@ -535,6 +814,8 @@ export const CONVERSATIONS: readonly Conversation[] = [
     status: "Open",
     unread: 0,
     delivery: "read",
+    messagingEligibility: "template-required",
+    linkedRecordId: "c712",
     lastDirection: "out",
   },
   {
@@ -550,6 +831,8 @@ export const CONVERSATIONS: readonly Conversation[] = [
     status: "Closed",
     unread: 0,
     delivery: "read",
+    messagingEligibility: "template-required",
+    linkedRecordId: "c688",
     lastDirection: "in",
   },
   {
@@ -565,6 +848,8 @@ export const CONVERSATIONS: readonly Conversation[] = [
     status: "Open",
     unread: 1,
     delivery: "delivered",
+    messagingEligibility: "free-form",
+    linkedRecordId: null,
     lastDirection: "in",
   },
   {
@@ -580,6 +865,8 @@ export const CONVERSATIONS: readonly Conversation[] = [
     status: "Open",
     unread: 0,
     delivery: "failed",
+    messagingEligibility: "unavailable",
+    linkedRecordId: "c517",
     lastDirection: "out",
   },
   {
@@ -595,6 +882,8 @@ export const CONVERSATIONS: readonly Conversation[] = [
     status: "Open",
     unread: 0,
     delivery: "read",
+    messagingEligibility: "template-required",
+    linkedRecordId: "l2044",
     lastDirection: "in",
   },
   {
@@ -610,6 +899,8 @@ export const CONVERSATIONS: readonly Conversation[] = [
     status: "Closed",
     unread: 0,
     delivery: "read",
+    messagingEligibility: "template-required",
+    linkedRecordId: "c733",
     lastDirection: "in",
   },
 ];
@@ -623,6 +914,15 @@ export type Message = {
   /** Set when the message was sent from an approved template. */
   template?: string;
   failureReason?: string;
+  /**
+   * The id of the failed attempt this message retries (§105).
+   *
+   * Present on the NEW attempt, never on the original: "retrying should
+   * create a new send attempt rather than rewriting the historical failed
+   * attempt as successful". The failed message keeps its own Failed state
+   * and stays in the history.
+   */
+  retryOf?: string;
 };
 
 export const THREAD: readonly Message[] = [
@@ -664,42 +964,214 @@ export const THREAD: readonly Message[] = [
   },
 ];
 
+/**
+ * The complete set of template variables §98 permits — nothing else.
+ *
+ * Each key maps to exactly one entry in §98's "Available variables" list:
+ *
+ * | key                       | §98 variable                   |
+ * | ------------------------- | ------------------------------ |
+ * | `customer_name`           | Customer Name                  |
+ * | `lead_name`               | Lead Name, where applicable    |
+ * | `product_category`        | Product Category               |
+ * | `provider`                | Provider                       |
+ * | `plan_sub_product`        | Plan / Sub-product             |
+ * | `policy_reference_number` | Policy or Reference Number     |
+ * | `renewal_date`            | Renewal Date                   |
+ * | `record_owner_name`       | Record Owner Name              |
+ * | `team_lead_name`          | Team Lead Name, where appropriate |
+ * | `business_name`           | A&S Fincare business name      |
+ * | `business_contact_details`| A&S Fincare contact details    |
+ *
+ * §98 also names what must never be a variable: policy document contents,
+ * authentication data or credentials, internal identifiers that would expose
+ * other records, and Closed Amount or other internal performance figures.
+ * A closed union is how that stays true — a template cannot introduce an
+ * arbitrary placeholder, because there is no type it could have.
+ */
+export const TEMPLATE_VARIABLES = [
+  "customer_name",
+  "lead_name",
+  "product_category",
+  "provider",
+  "plan_sub_product",
+  "policy_reference_number",
+  "renewal_date",
+  "record_owner_name",
+  "team_lead_name",
+  "business_name",
+  "business_contact_details",
+] as const;
+
+export type TemplateVariable = (typeof TEMPLATE_VARIABLES)[number];
+
+/**
+ * The platform states §97 lists for a template.
+ *
+ * Deliberately not a boolean. `approved: false` could not say whether a
+ * template is awaiting review, was turned down, or is simply not available
+ * on the connected account — and §97 requires the interface to explain which.
+ */
+export type TemplateStatus =
+  "Approved" | "Pending" | "Rejected" | "Unavailable";
+
 export type Template = {
   id: string;
   name: string;
+  /** §97 "Purpose" column: what the template is used for. */
+  purpose: string;
+  /** §97 "Language" column. */
+  language: string;
+  /** The state reported by the connected WhatsApp provider (§97). */
+  status: TemplateStatus;
+  /**
+   * Whether A&S Fincare still keeps this template in use.
+   *
+   * Separate from `status`, because §97 makes "an inactive, pending, rejected
+   * or unavailable template" unselectable — inactive is a CRM-side fact about
+   * a template the platform may still report as Approved.
+   */
+  active: boolean;
   category: "Utility" | "Marketing";
+  /**
+   * The §98 variables this template declares.
+   *
+   * Typed as the closed union, so a template cannot declare something §98
+   * does not permit. Validation also checks the body agrees with this list in
+   * both directions — see `validateTemplate`.
+   */
+  variables: readonly TemplateVariable[];
   body: string;
-  approved: boolean;
 };
 
+/**
+ * Sample template catalogue (§97, §197).
+ *
+ * Every placeholder is a §98 variable and every §98 variable used is declared.
+ * Nothing here has been submitted to or approved by Meta: these are
+ * placeholder rows illustrating the intended interface.
+ *
+ * The catalogue deliberately splits Lead-addressed from Customer-addressed
+ * templates, because §98 keeps Lead Name and Customer Name apart and a Lead
+ * has no Customer Purchase to resolve a policy reference or renewal date
+ * from.
+ */
 export const TEMPLATES: readonly Template[] = [
   {
     id: "t1",
-    name: "Follow-up reminder",
+    name: "Lead follow-up reminder",
+    purpose: "Follow-up",
+    language: "English",
+    status: "Approved",
+    active: true,
     category: "Utility",
-    body: "Hello {{customer_name}}, following up on our conversation about {{product}}. Let me know a convenient time to call you.",
-    approved: true,
+    variables: ["lead_name", "product_category", "business_name"],
+    body: "Hello {{lead_name}}, following up on your {{product_category}} enquiry with {{business_name}}. Let me know a convenient time to call you.",
   },
   {
     id: "t2",
     name: "Policy renewal reminder",
+    purpose: "Renewal",
+    language: "English",
+    status: "Approved",
+    active: true,
     category: "Utility",
-    body: "Hello {{customer_name}}, your {{product}} policy expires on {{due_date}}. Would you like A&S Fincare to assist with the renewal?",
-    approved: true,
+    variables: [
+      "customer_name",
+      "plan_sub_product",
+      "provider",
+      "renewal_date",
+      "business_name",
+    ],
+    body: "Hello {{customer_name}}, your {{plan_sub_product}} policy with {{provider}} is due for renewal on {{renewal_date}}. Reply here if you would like {{business_name}} to assist.",
   },
   {
     id: "t3",
-    name: "Document request",
+    name: "Policy document request",
+    purpose: "Service",
+    language: "English",
+    status: "Approved",
+    active: true,
     category: "Utility",
-    body: "Hello {{customer_name}}, to process your {{product}} we need a copy of {{document}}. You can reply to this message with a photo.",
-    approved: true,
+    // The document itself is NOT a variable: §98 forbids policy document
+    // contents, and there is no §98 variable for a document name. The
+    // template asks in general terms and leaves the specifics to the reply.
+    variables: [
+      "customer_name",
+      "product_category",
+      "policy_reference_number",
+      "record_owner_name",
+    ],
+    body: "Hello {{customer_name}}, we need one more document to continue with your {{product_category}} policy {{policy_reference_number}}. {{record_owner_name}} will confirm which one and can collect it over WhatsApp.",
   },
   {
     id: "t4",
-    name: "Appointment confirmation",
+    name: "Your advisor and escalation contact",
+    purpose: "Service",
+    language: "English",
+    status: "Approved",
+    active: true,
     category: "Utility",
-    body: "Hello {{customer_name}}, confirming your appointment at the A&S Fincare office on {{date}} at {{time}}.",
-    approved: true,
+    // Replaces the old appointment confirmation, which could only work by
+    // parameterising an appointment date and time — neither of which §98
+    // permits as a variable.
+    variables: [
+      "customer_name",
+      "product_category",
+      "record_owner_name",
+      "team_lead_name",
+      "business_name",
+      "business_contact_details",
+    ],
+    body: "Hello {{customer_name}}, {{record_owner_name}} is looking after your {{product_category}} policy at {{business_name}}. If you need anything further, {{team_lead_name}} can help. Reach us on {{business_contact_details}}.",
+  },
+  {
+    id: "t5",
+    name: "Policy document shared",
+    purpose: "Service",
+    language: "English",
+    status: "Pending",
+    active: true,
+    category: "Utility",
+    variables: ["customer_name", "product_category"],
+    body: "Hello {{customer_name}}, your {{product_category}} policy document is ready. Reply here if you would like a printed copy.",
+  },
+  {
+    id: "t6",
+    name: "Festive offer",
+    purpose: "Marketing",
+    language: "English",
+    status: "Rejected",
+    active: true,
+    category: "Marketing",
+    variables: ["customer_name", "product_category", "business_name"],
+    body: "Hello {{customer_name}}, {{business_name}} has a limited-period offer on {{product_category}}. Reply OFFER to know more.",
+  },
+  {
+    id: "t7",
+    name: "Plan confirmation",
+    purpose: "Quote",
+    language: "Malayalam",
+    status: "Unavailable",
+    active: true,
+    category: "Utility",
+    // The old version parameterised a premium amount, which is not a §98
+    // variable. It names the plan and provider instead.
+    variables: ["customer_name", "plan_sub_product", "provider"],
+    body: "Hello {{customer_name}}, we have your {{plan_sub_product}} plan with {{provider}} ready to proceed. Shall we go ahead?",
+  },
+  {
+    id: "t8",
+    // Approved on the platform, but A&S Fincare has taken it out of use.
+    // §97 still makes it unselectable, which is why `active` exists.
+    name: "Welcome message",
+    purpose: "Onboarding",
+    language: "English",
+    status: "Approved",
+    active: false,
+    category: "Utility",
+    variables: ["customer_name", "business_name", "record_owner_name"],
+    body: "Hello {{customer_name}}, welcome to {{business_name}}. {{record_owner_name}} will contact you shortly.",
   },
 ];
 
@@ -1724,7 +2196,8 @@ export const MOBILE_RENEWALS: readonly MobileRenewal[] = [
         channel: "WhatsApp",
         status: "Failed",
         date: "02 Sep 2026",
-        failureReason: "Outside the 24-hour window and no approved template",
+        failureReason:
+          "The reminder template was not approved at the time of sending.",
       },
     ],
     lastContact: "Call · 08 Sep",
@@ -2587,13 +3060,13 @@ export const EMAIL_TEMPLATES = [
   {
     id: "et1",
     name: "Renewal reminder",
-    subject: "Your {{product}} renewal is due on {{due_date}}",
+    subject: "Your {{product_category}} renewal is due on {{renewal_date}}",
     status: "Active",
   },
   {
     id: "et2",
     name: "Policy document",
-    subject: "Your {{product}} policy documents",
+    subject: "Your {{product_category}} policy documents",
     status: "Active",
   },
   {

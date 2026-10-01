@@ -115,7 +115,7 @@ describe("assignment changes state (§93.1, §101)", () => {
     expect(conversationById(unknown.id)!.assignedToUserId).toBe(USER.ajay);
     // After: the composer is present because the Admin may now reply.
     expect(screen.getByRole("button", { name: /^Send$/ })).toBeInTheDocument();
-    expect(screen.getByText("Write a reply…")).toBeInTheDocument();
+    expect(screen.getByLabelText("Write a reply")).toBeInTheDocument();
     expect(screen.queryByLabelText("Assign to an active Team Lead")).toBeNull();
   });
 

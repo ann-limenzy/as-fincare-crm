@@ -10,12 +10,12 @@ import { ChannelMark } from "@/components/wireframes/whatsapp/parts";
 import { DeliveryTag } from "@/components/wireframes/whatsapp/parts";
 import { Avatar, ScreenHeading } from "@/components/wireframes/wf-ui";
 import { Button } from "@/components/ui/button";
-import { CONVERSATIONS } from "@/lib/wireframes/mock-data";
 import { USER, userById } from "@/lib/wireframes/sales-teams";
 import {
   maySeeUnassignedQueue,
   visibleConversationsFor,
 } from "@/lib/wireframes/whatsapp-access";
+import { eligibilityLabel } from "@/lib/wireframes/whatsapp-messaging";
 import {
   getConversationServerState,
   getConversationState,
@@ -236,6 +236,14 @@ export function InboxScreen() {
                   }
                 />
                 <Fact label="Status" value={active.status} />
+                {/*
+                  §114: the messaging state the integration reports, shown
+                  before the reply is attempted rather than after it fails.
+                */}
+                <Fact
+                  label="Messaging"
+                  value={eligibilityLabel(active.messagingEligibility)}
+                />
               </dl>
 
               <p className="mt-5 rounded-lg border border-border bg-muted px-3 py-2.5 text-sm text-muted-foreground">

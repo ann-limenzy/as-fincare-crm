@@ -190,19 +190,42 @@ export function reassignmentTargetsFor(
 ): readonly SettingsUser[] {
   if (conversation.assignedToUserId === null) return [];
   if (!mayViewConversation(user, conversation)) return [];
+  // Salesperson stays an explicit empty set: §93 leaves their reassignment
+  // permission pending, which is a narrower thing than their visibility.
   const ids =
-    user.role === "Admin"
-      ? new Set(
-          SALES_TEAMS.flatMap((t) => activeMemberships(t).map((m) => m.userId)),
-        )
-      : user.role === "Manager"
-        ? userIdsUnder(user)
-        : user.role === "Team Lead"
-          ? userIdsInOwnTeam(user)
-          : new Set<string>(); // Salesperson — pending confirmation
+    user.role === "Salesperson"
+      ? new Set<string>()
+      : operationalUserIdsInScope(user);
   return SETTINGS_USERS.filter(
     (u) => ids.has(u.id) && u.status === "Active" && isOperationalRole(u.role),
   );
+}
+
+/**
+ * Every operational user id `user` may see, by role (§89.1).
+ *
+ * Used wherever something other than the conversation itself has to be
+ * checked against the actor's scope — a linked record's Record Owner, for
+ * instance. Returning ids rather than names is the point: a name comparison
+ * would happily match a different person in another team.
+ */
+export function operationalUserIdsInScope(
+  user: SettingsUser,
+): ReadonlySet<string> {
+  switch (user.role) {
+    case "Admin":
+      return new Set(
+        SALES_TEAMS.flatMap((t) => activeMemberships(t).map((m) => m.userId)),
+      );
+    case "Manager":
+      return userIdsUnder(user);
+    case "Team Lead":
+      return userIdsInOwnTeam(user);
+    case "Salesperson":
+      // Their own work only. §89.1: "a Salesperson cannot see a peer's
+      // conversations, including peers in the same team."
+      return new Set([user.id]);
+  }
 }
 
 /** §93: a Salesperson's reassignment permission is not settled. */

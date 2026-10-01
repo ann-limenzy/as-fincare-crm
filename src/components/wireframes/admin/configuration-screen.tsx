@@ -27,6 +27,7 @@ import {
   REMINDER_RULES,
   TEMPLATES,
 } from "@/lib/wireframes/mock-data";
+import { templateUnavailableReason } from "@/lib/wireframes/whatsapp-messaging";
 import { cn } from "@/lib/utils";
 
 /**
@@ -276,16 +277,52 @@ function WhatsAppTab() {
                 <p className="min-w-0 flex-1 truncate text-sm font-medium text-foreground">
                   {t.name}
                 </p>
+                {/* §97's columns: Purpose, Language, Status. */}
                 <span className="shrink-0 rounded-full bg-muted px-2.5 py-0.5 text-xs text-muted-foreground">
-                  {t.category}
+                  {t.purpose}
                 </span>
-                <span className="shrink-0 rounded-full border border-success/30 bg-success-subtle px-2.5 py-0.5 text-xs font-medium text-success-on-subtle">
-                  Approved
+                <span className="shrink-0 rounded-full bg-muted px-2.5 py-0.5 text-xs text-muted-foreground">
+                  {t.language}
+                </span>
+                <span
+                  className={cn(
+                    "shrink-0 rounded-full border px-2.5 py-0.5 text-xs font-medium",
+                    !t.active
+                      ? "border-border-strong/40 bg-neutral-subtle text-neutral-on-subtle"
+                      : t.status === "Approved"
+                        ? "border-success/30 bg-success-subtle text-success-on-subtle"
+                        : t.status === "Pending"
+                          ? "border-warning/30 bg-warning-subtle text-warning-on-subtle"
+                          : t.status === "Rejected"
+                            ? "border-danger/30 bg-danger-subtle text-danger-on-subtle"
+                            : "border-border-strong/40 bg-neutral-subtle text-neutral-on-subtle",
+                  )}
+                >
+                  {t.active ? t.status : "Not in use"}
                 </span>
               </div>
               <p className="mt-1.5 text-xs leading-relaxed text-muted-foreground">
                 {t.body}
               </p>
+              {/*
+                §98's variables, listed for the administrator. The operational
+                picker shows none of this: there it is already substituted.
+              */}
+              <p className="mt-1.5 flex flex-wrap gap-1">
+                {t.variables.map((v) => (
+                  <code
+                    key={v}
+                    className="rounded bg-muted px-1.5 py-0.5 text-[10px] text-muted-foreground"
+                  >
+                    {`{{${v}}}`}
+                  </code>
+                ))}
+              </p>
+              {templateUnavailableReason(t) ? (
+                <p className="mt-1 text-xs font-medium text-muted-foreground">
+                  {templateUnavailableReason(t)}
+                </p>
+              ) : null}
             </li>
           ))}
         </ul>
@@ -293,9 +330,11 @@ function WhatsAppTab() {
 
       <Note icon={CircleAlert} tone="warning">
         WhatsApp requires Meta to approve each template before it can be sent.
-        No approval has been requested in these wireframes — a real template
-        moves through Draft, Submitted and Approved before it appears to
-        salespeople.
+        No approval has been requested in these wireframes. Creation, editing
+        and approval happen on the WhatsApp platform — the CRM lists what the
+        connected account reports and sends the administrator there, rather than
+        implying the change was made here. Managing templates is business data
+        and changes nobody&rsquo;s permissions.
       </Note>
     </div>
   );
