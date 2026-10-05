@@ -69,15 +69,15 @@ V1 is delivered as a single responsive web application:
 >
 > • installable Progressive Web App behaviour, defined in Section 210.1
 >
-> • Supabase / PostgreSQL
+> • Neon-hosted PostgreSQL
 >
 > • Drizzle ORM
 >
-> • Supabase Auth
+> • JWT-based authentication — implementation library/provider to be finalized
 >
-> • Supabase Storage
+> • Cloudflare R2 private object storage
 >
-> • Meta WhatsApp Cloud API
+> • WhatsApp Business Platform using Cloud API with Coexistence
 >
 > • the full Email module in V1
 
