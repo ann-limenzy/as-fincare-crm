@@ -5,6 +5,7 @@ import {
   Building2,
   ChevronDown,
   Database,
+  Flame,
   GitBranch,
   Mail,
   MessageCircle,
@@ -29,6 +30,7 @@ import {
   configStatus,
   teamWarning,
 } from "@/lib/wireframes/sales-teams";
+import { selectablePriorities } from "@/lib/wireframes/lead-priority";
 import { cn } from "@/lib/utils";
 
 /**
@@ -61,6 +63,9 @@ const TEAM_WARNINGS = SALES_TEAMS.filter((t) => teamWarning(t)).length;
 const CONFIG_WARNINGS = CONFIGURED_TEAMS.filter(
   (t) => configStatus(t) !== "Ready",
 ).length;
+
+/** §192: the values currently offered. Derived, never a typed-in number. */
+const ACTIVE_PRIORITIES = selectablePriorities();
 
 const CARDS: readonly Card[] = [
   {
@@ -129,6 +134,16 @@ const CARDS: readonly Card[] = [
     detail:
       "The stages a lead moves through. Rename or reorder them to match how A&S Fincare actually sells.",
     items: ["Active stages", "Add a stage", "Reorder", "Default first stage"],
+  },
+  {
+    id: "lead-priority",
+    href: "/wireframes/admin/lead-priority",
+    title: "Lead Priority",
+    icon: Flame,
+    summary: `${ACTIVE_PRIORITIES.length} active values`,
+    detail:
+      "How urgent or promising a Lead is. A separate field from the pipeline stage, never a stage itself.",
+    items: ["Active values", "Add a value", "Reorder", "Deactivated values"],
   },
   {
     id: "products",

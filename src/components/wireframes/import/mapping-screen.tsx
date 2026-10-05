@@ -22,6 +22,10 @@ import {
   TEAM,
   type MappingStatus,
 } from "@/lib/wireframes/mock-data";
+import {
+  resolveDefaultPriority,
+  selectablePriorities,
+} from "@/lib/wireframes/lead-priority";
 import { cn } from "@/lib/utils";
 
 /**
@@ -76,6 +80,13 @@ export function MappingScreen() {
   );
   const [resolvedOwner, setResolvedOwner] = useState<string>("");
   const [resolvedStage, setResolvedStage] = useState<string>("");
+  /**
+   * §149: an unmatched Priority value is mapped by the user to an ACTIVE
+   * configured value. Its own state, because mapping Stage must not set
+   * Priority and mapping Priority must not set Stage.
+   */
+  const [resolvedPriority, setResolvedPriority] = useState<string>("");
+  const configuredDefault = resolveDefaultPriority();
 
   const rows = useMemo(
     () =>
@@ -87,9 +98,10 @@ export function MappingScreen() {
         else if (value !== m.crmField) status = "confirmed";
         if (m.id === "c4" && resolvedOwner) status = "confirmed";
         if (m.id === "c5" && resolvedStage) status = "confirmed";
+        if (m.id === "c5b" && resolvedPriority) status = "confirmed";
         return { ...m, value, status };
       }),
-    [fields, resolvedOwner, resolvedStage],
+    [fields, resolvedOwner, resolvedStage, resolvedPriority],
   );
 
   // Lead Name plus one contact method — spec §123.
@@ -215,6 +227,34 @@ export function MappingScreen() {
                         {row.id === "c5" && resolvedStage ? (
                           <Resolved value={resolvedStage} />
                         ) : null}
+
+                        {/*
+                          §149: matched against the ACTIVE Lead Priority values
+                          only, so an import can neither create a value nor
+                          revive a deactivated one. The default is offered as
+                          the alternative, never a guess at what "High" meant.
+                        */}
+                        {row.id === "c5b" && !resolvedPriority ? (
+                          <ResolveInline
+                            label="Map “High” to"
+                            options={selectablePriorities().map((p) => p.label)}
+                            /*
+                              §149's fallback is "the configured default
+                              priority value" — the explicitly configured one or
+                              nothing. If the configuration cannot supply one,
+                              the action is withheld rather than guessing.
+                            */
+                            extra={
+                              configuredDefault.ok
+                                ? `Use the default priority (${configuredDefault.priority.label})`
+                                : undefined
+                            }
+                            onChoose={setResolvedPriority}
+                          />
+                        ) : null}
+                        {row.id === "c5b" && resolvedPriority ? (
+                          <Resolved value={resolvedPriority} />
+                        ) : null}
                       </td>
                       <td className="px-4 py-3">
                         <span
@@ -307,7 +347,8 @@ function ResolveInline({
 }: {
   label: string;
   options: readonly string[];
-  extra: string;
+  /** The alternative to mapping. Omitted where there is not a usable one. */
+  extra?: string;
   onChoose: (value: string) => void;
 }) {
   return (
@@ -325,7 +366,7 @@ function ResolveInline({
             {o}
           </option>
         ))}
-        <option value={extra}>{extra}</option>
+        {extra ? <option value={extra}>{extra}</option> : null}
       </select>
     </div>
   );

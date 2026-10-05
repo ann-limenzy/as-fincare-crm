@@ -28,6 +28,7 @@ import {
   WORKSPACE,
   type WorkItem,
 } from "@/lib/wireframes/mock-data";
+import { PriorityBadge } from "@/components/wireframes/lead-priority-parts";
 import { cn } from "@/lib/utils";
 
 /**
@@ -318,6 +319,17 @@ function WorkCard({ item }: { item: WorkItem }) {
           {item.status}
         </span>
       </div>
+
+      {/*
+        §57: priority is shown on the Lead rows a salesperson works from, as a
+        labelled indicator beside the queue status rather than in place of it.
+        Only Lead rows carry one — a renewal or a call has no Lead Priority.
+      */}
+      {item.priorityId ? (
+        <p className="mt-1.5">
+          <PriorityBadge priorityId={item.priorityId} withLabel />
+        </p>
+      ) : null}
 
       {item.note ? (
         <p className="mt-1.5 truncate text-xs text-muted-foreground">

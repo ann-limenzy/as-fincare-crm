@@ -339,6 +339,14 @@ export const FLOWS: readonly Flow[] = [
         device: "desktop",
       },
       {
+        href: "/wireframes/admin/lead-priority",
+        label: "Lead Priority",
+        title: "Lead Priority",
+        summary:
+          "How urgent a Lead is — a separate field from the pipeline stage, with its own configured values.",
+        device: "desktop",
+      },
+      {
         href: "/wireframes/admin/configuration",
         label: "Configuration",
         title: "Products, reminders and templates",

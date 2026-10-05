@@ -4,6 +4,7 @@ import {
   ArrowLeft,
   CalendarPlus,
   CircleCheck,
+  Flame,
   Mail,
   MessageCircle,
   MessageSquarePlus,
@@ -13,6 +14,7 @@ import type { Route } from "next";
 import Link from "next/link";
 import { useState } from "react";
 
+import { PriorityBadge } from "@/components/wireframes/lead-priority-parts";
 import { CallHandoffSheet } from "@/components/wireframes/mobile-sheet-parts";
 import {
   PhoneFrame,
@@ -25,6 +27,10 @@ import {
   SALES_PERSONA,
   type Activity,
 } from "@/lib/wireframes/mock-data";
+import {
+  displayPriority,
+  selectablePriorities,
+} from "@/lib/wireframes/lead-priority";
 import { cn } from "@/lib/utils";
 
 /**
@@ -69,6 +75,18 @@ function backTarget(from: string | null) {
 export function RecordScreen({ from }: { from: string | null }) {
   const [handover, setHandover] = useState(false);
   const back = backTarget(from);
+
+  /**
+   * §57: "changing Lead Priority must be possible from mobile, since
+   * Salespersons work from phones."
+   *
+   * Local component state — nothing is saved. The Lead's stage is deliberately
+   * NOT part of this state: §192 and §43 make the two independent, and the
+   * only way to be sure of that is for the stage to have no way of changing
+   * here at all.
+   */
+  const [priorityId, setPriorityId] = useState<string>(LEAD_RECORD.priorityId);
+  const priority = displayPriority(priorityId);
 
   return (
     <div className="app-ambient min-h-dvh">
@@ -116,8 +134,16 @@ export function RecordScreen({ from }: { from: string | null }) {
                     {LEAD_RECORD.reference}
                   </p>
                 </div>
-                <span className="shrink-0 rounded-full border border-primary/30 bg-primary/12 px-2.5 py-1 text-[11px] font-medium text-primary">
-                  {LEAD_RECORD.stage}
+                {/*
+                  §57: "Priority and stage are both shown and are visibly
+                  distinct. Priority is not a stage and must not be rendered as
+                  one." Two indicators, each naming its own field.
+                */}
+                <span className="flex shrink-0 flex-wrap items-center justify-end gap-1">
+                  <PriorityBadge priorityId={priorityId} />
+                  <span className="rounded-full border border-primary/30 bg-primary/12 px-2.5 py-1 text-[11px] font-medium text-primary">
+                    {LEAD_RECORD.stage}
+                  </span>
                 </span>
               </header>
             }
@@ -182,6 +208,16 @@ export function RecordScreen({ from }: { from: string | null }) {
               {/* Status facts */}
               <section className="surface-solid rounded-xl p-4">
                 <dl className="flex flex-col gap-3 text-sm">
+                  {/*
+                    §43: separate fields, displayed separately. Priority says
+                    how urgent the Lead is; Stage says how far it has reached.
+                  */}
+                  <FactRow
+                    label="Priority"
+                    value={
+                      priority.label + (priority.retired ? " (retired)" : "")
+                    }
+                  />
                   <FactRow label="Stage" value={LEAD_RECORD.stage} />
                   {/* "You" rather than her own name: on the salesperson's own screen,
                       repeating it says less than confirming the lead is hers. */}
@@ -199,6 +235,41 @@ export function RecordScreen({ from }: { from: string | null }) {
                     emphasis
                   />
                 </dl>
+
+                {/*
+                  §192: only currently active values are offered. A Lead holding
+                  a deactivated value keeps showing it above, but cannot be
+                  moved back onto one.
+                */}
+                <div className="mt-3.5 border-t border-border pt-3.5">
+                  <label
+                    htmlFor="lead-priority"
+                    className="mb-1.5 block text-xs font-medium text-foreground"
+                  >
+                    Change priority
+                  </label>
+                  <select
+                    id="lead-priority"
+                    value={priority.retired ? "" : priorityId}
+                    onChange={(e) => setPriorityId(e.target.value)}
+                    className="h-11 w-full rounded-lg border border-input bg-surface px-2.5 text-sm text-foreground"
+                  >
+                    {priority.retired ? (
+                      <option value="">{priority.label} — retired</option>
+                    ) : null}
+                    {selectablePriorities().map((p) => (
+                      <option key={p.id} value={p.id}>
+                        {p.label}
+                      </option>
+                    ))}
+                  </select>
+                  <p className="mt-2 text-[11px] leading-relaxed text-muted-foreground">
+                    Priority is how urgent this Lead is. It is a separate field
+                    from Stage — changing it leaves the Lead at{" "}
+                    {LEAD_RECORD.stage}, and does not change who owns the Lead
+                    or how new Leads are shared out.
+                  </p>
+                </div>
               </section>
 
               {/* Activity */}
@@ -302,6 +373,11 @@ function ActivityDot({ kind }: { kind: Activity["kind"] }) {
     stage: {
       icon: CircleCheck,
       className: "bg-info-subtle text-info-on-subtle",
+    },
+    /* §45 keeps a priority change visibly distinct from a stage change. */
+    priority: {
+      icon: Flame,
+      className: "bg-warning-subtle text-warning-on-subtle",
     },
     created: {
       icon: MessageSquarePlus,

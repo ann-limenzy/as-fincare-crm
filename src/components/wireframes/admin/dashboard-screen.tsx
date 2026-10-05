@@ -4,6 +4,7 @@ import {
   CalendarCheck,
   ChartColumn,
   Clock,
+  Flame,
   MessageCircle,
   Phone,
   UserPlus,
@@ -11,6 +12,7 @@ import {
 } from "lucide-react";
 
 import { CrmChrome } from "@/components/wireframes/crm-chrome";
+import { PriorityBadge } from "@/components/wireframes/lead-priority-parts";
 import {
   Avatar,
   Metric,
@@ -20,6 +22,7 @@ import {
 } from "@/components/wireframes/wf-ui";
 import {
   CURRENT_USER,
+  LEAD_PRIORITY_COUNTS,
   PIPELINE,
   PIPELINE_TOTALS,
   RECENT_ACTIVITY,
@@ -30,6 +33,7 @@ import {
   WORKSPACE,
   type Activity,
 } from "@/lib/wireframes/mock-data";
+import { orderedPriorities } from "@/lib/wireframes/lead-priority";
 import { cn } from "@/lib/utils";
 
 /**
@@ -219,6 +223,34 @@ export function AdminDashboardScreen() {
                   {PIPELINE_TOTALS.total} leads across stages ·{" "}
                   {PIPELINE_TOTALS.active} active · {PIPELINE_TOTALS.won} won
                 </p>
+
+                {/*
+                  §21: "the widget should also convey Lead Priority, for example
+                  as a breakdown… Priority is a separate dimension from stage.
+                  It must not be shown as an additional pipeline column."
+                  So it is a second line beneath the stage chart, counting the
+                  same leads along the other axis — not a fifth bar.
+                */}
+                <div className="mt-3 border-t border-border pt-3">
+                  <p className="text-xs font-medium text-foreground">
+                    By priority
+                  </p>
+                  <ul className="mt-1.5 flex flex-wrap items-center gap-x-3 gap-y-1.5">
+                    {orderedPriorities().map((p) => (
+                      <li key={p.id} className="flex items-center gap-1.5">
+                        <PriorityBadge priorityId={p.id} />
+                        <span className="text-xs text-muted-foreground">
+                          {LEAD_PRIORITY_COUNTS[p.id] ?? 0}
+                        </span>
+                      </li>
+                    ))}
+                  </ul>
+                  <p className="mt-2 text-[11px] leading-relaxed text-muted-foreground">
+                    The same {PIPELINE_TOTALS.total} leads, counted by priority
+                    instead of by stage. A lead has one of each — selecting a
+                    priority never moves it between stages.
+                  </p>
+                </div>
               </div>
             </Panel>
 
@@ -370,6 +402,11 @@ function ActivityIcon({ kind }: { kind: Activity["kind"] }) {
     stage: {
       icon: BellRing,
       className: "bg-success-subtle text-success-on-subtle",
+    },
+    /* §45 keeps a priority change visibly distinct from a stage change. */
+    priority: {
+      icon: Flame,
+      className: "bg-warning-subtle text-warning-on-subtle",
     },
     created: {
       icon: UserPlus,

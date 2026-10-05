@@ -107,7 +107,8 @@ export const IMPORT_FILE = {
   name: "leads-september.xlsx",
   size: "184 KB",
   rows: 428,
-  columns: 11,
+  // 12 columns: the Priority column (§149) is its own, never shared with Stage.
+  columns: 12,
   uploadedAt: "11 Sep 2026, 10:04 AM",
 } as const;
 
@@ -171,6 +172,24 @@ export const COLUMN_MAPPINGS: readonly ColumnMapping[] = [
     note: '"Follow Up" does not match an active pipeline stage. Map it to an existing stage — import never creates stages.',
   },
   {
+    /*
+     * §149: "Hot → Hot", "High → No matching priority value". The uploaded
+     * value is matched against the ACTIVE configured values and an unmatched
+     * one is mapped by the user — import never creates a priority value, and
+     * never converts an unknown one.
+     *
+     * "Lead Temp" is an ILLUSTRATIVE uploaded column name added to demonstrate
+     * this mapping. It did not come from A&S Fincare's own spreadsheet; the
+     * original sample file had eleven columns and no priority column at all.
+     */
+    id: "c5b",
+    uploadedColumn: "Lead Temp",
+    sampleValue: "High",
+    crmField: "Lead Priority",
+    status: "needs-review",
+    note: '"High" does not match an active Lead Priority value. Map it to an existing value — import never creates priority values, and never guesses one.',
+  },
+  {
     id: "c6",
     uploadedColumn: "Policy",
     sampleValue: "Health Insurance",
@@ -222,6 +241,10 @@ export const CRM_FIELDS: readonly string[] = [
   "Email",
   "Record Owner",
   "Lead Stage",
+  // §149: its own field. "A single uploaded column cannot populate both.
+  // Mapping a column to Stage does not set Priority, and mapping a column to
+  // Priority does not set Stage."
+  "Lead Priority",
   "Lead Source",
   "Product / Service Interested In",
   "Notes",
@@ -301,6 +324,22 @@ export const VALIDATION_ISSUES: readonly ValidationIssue[] = [
     problem: "Unknown Lead Stage",
     category: "attention",
     actions: ["Map to an existing stage", "Use first active stage", "Edit row"],
+  },
+  {
+    /*
+     * §153 lists "unknown Lead Priority value" as its own validation issue,
+     * separate from "unknown pipeline stage". Neither resolves the other.
+     */
+    row: 118,
+    name: "Arjun Pillai",
+    detail: "Lead Temp: High",
+    problem: "Unknown Lead Priority value",
+    category: "attention",
+    actions: [
+      "Map to an active priority value",
+      "Use the default priority",
+      "Edit row",
+    ],
   },
   {
     row: 146,
@@ -1185,6 +1224,13 @@ export type WorkItem = {
   status: "Due" | "Overdue" | "Scheduled" | "New" | "Unread";
   type: "Call" | "WhatsApp" | "Renewal" | "Lead";
   note?: string;
+  /**
+   * Lead Priority by stable id (§192), on Lead rows.
+   *
+   * §57 requires priority to be reachable and legible on the phone, where the
+   * salesperson actually works.
+   */
+  priorityId?: string;
 };
 
 export const DUE_TODAY: readonly WorkItem[] = [
@@ -1246,6 +1292,9 @@ export const NEW_LEADS: readonly WorkItem[] = [
     status: "New",
     type: "Lead",
     note: "Walk-in enquiry",
+    // Matches her own Lead row in SALES_LEADS. Priority is a property of the
+    // Lead, not of the queue it appears in.
+    priorityId: "lp-hot",
   },
   {
     id: "n2",
@@ -1254,6 +1303,7 @@ export const NEW_LEADS: readonly WorkItem[] = [
     due: "Assigned yesterday",
     status: "New",
     type: "Lead",
+    priorityId: "lp-cold",
   },
 ];
 
@@ -1263,7 +1313,20 @@ export const LEAD_RECORD = {
   phoneDial: "+917000041288",
   email: "priya.iyer@example.in",
   product: "Health Insurance",
+  /**
+   * Where the Lead has reached in the sales process (§191).
+   *
+   * Separate from `priorityId` below, and never substituted for it: §43
+   * "Priority and Stage are separate fields and are displayed separately."
+   */
   stage: "Interested",
+  /**
+   * How urgent or promising the Lead is (§192), by stable id.
+   *
+   * A reference, not a label, so renaming the value does not change what this
+   * Lead holds (§207). §57's own example shows Priya as Warm.
+   */
+  priorityId: "lp-warm",
   recordType: "Lead" as const,
   reference: "Lead · #2088",
   owner: "Sneha Thomas",
@@ -1276,7 +1339,14 @@ export type Activity = {
   title: string;
   detail: string;
   time: string;
-  kind: "call" | "whatsapp" | "note" | "stage" | "created" | "followup";
+  kind:
+    | "call"
+    | "whatsapp"
+    | "note"
+    | "stage"
+    | "priority"
+    | "created"
+    | "followup";
 };
 
 export const RECORD_ACTIVITY: readonly Activity[] = [
@@ -1300,6 +1370,18 @@ export const RECORD_ACTIVITY: readonly Activity[] = [
     detail: "Contacted → Interested",
     time: "08 Sep, 3:40 PM",
     kind: "stage",
+  },
+  {
+    /*
+     * §45: "Stage changes and priority changes are recorded as separate,
+     * clearly distinguishable entries." Two entries, two kinds, and the stage
+     * above is unaffected by the priority change below.
+     */
+    id: "a3b",
+    title: "Priority changed by Sneha",
+    detail: "Cold → Warm",
+    time: "08 Sep, 3:39 PM",
+    kind: "priority",
   },
   {
     id: "a4",
@@ -1332,6 +1414,89 @@ export const RECORD_ACTIVITY: readonly Activity[] = [
  * Lead stage or the Customer status". They remain valid elsewhere as pipeline
  * stages and conversion events.
  */
+/**
+ * One append-only audit entry for a Lead Priority change (§208).
+ *
+ * §208 lists "Lead Priority changes" among the actions that must be audited,
+ * and the entries are "written by the application and are never" editable. §45
+ * keeps this distinct from the ordinary activity timeline, so this is its own
+ * list rather than another `Activity` kind.
+ *
+ * The labels are SNAPSHOTS taken when the change happened, not lookups: §207
+ * requires that "renaming or deactivating a Lead Priority value should not
+ * rewrite the priority recorded in past activity or audit entries". Ids are
+ * kept alongside so an entry can still be tied to the value it refers to.
+ */
+export type PriorityAuditEntry = {
+  readonly id: string;
+  /** Which Lead. */
+  readonly leadId: string;
+  readonly leadName: string;
+  /** SETTINGS_USERS id of whoever performed it (§207: recorded against them). */
+  readonly actorUserId: string;
+  readonly fromPriorityId: string | null;
+  readonly fromLabel: string | null;
+  readonly toPriorityId: string;
+  readonly toLabel: string;
+  readonly at: string;
+  /**
+   * §208 does not require a reason for a priority change, so none is invented.
+   * The field exists only because the Lead screens already let a user add a
+   * note alongside the change, and it is optional.
+   */
+  readonly note?: string;
+};
+
+/**
+ * Sample audit entries.
+ *
+ * Deterministic: the wireframes have no persistence, and §208's point is the
+ * shape and the scope of the record rather than a live trail.
+ */
+export const PRIORITY_AUDIT: readonly PriorityAuditEntry[] = [
+  {
+    id: "pa1",
+    leadId: "l2088",
+    leadName: "Priya Iyer",
+    actorUserId: "s3", // Sneha Thomas — the Record Owner, in this case
+    fromPriorityId: "lp-cold",
+    fromLabel: "Cold",
+    toPriorityId: "lp-warm",
+    toLabel: "Warm",
+    at: "08 Sep 2026, 3:39 PM",
+  },
+  {
+    id: "pa2",
+    leadId: "l2107",
+    leadName: "Rajesh Menon",
+    // An Admin acted. §207: ownership stays with the operational user and the
+    // action is recorded against whoever performed it.
+    actorUserId: "s1", // Arun Menon
+    fromPriorityId: "lp-warm",
+    fromLabel: "Warm",
+    toPriorityId: "lp-hot",
+    toLabel: "Hot",
+    at: "09 Sep 2026, 11:20 AM",
+    note: "Customer asked for a quote the same week.",
+  },
+  {
+    id: "pa3",
+    leadId: "l2119",
+    leadName: "Arjun Pillai",
+    actorUserId: "s3",
+    fromPriorityId: "lp-warm",
+    fromLabel: "Warm",
+    /*
+     * The labels are snapshots taken at the time, not lookups. §207: "renaming
+     * or deactivating a Lead Priority value should not rewrite the priority
+     * recorded in past activity or audit entries."
+     */
+    toPriorityId: "lp-cold",
+    toLabel: "Cold",
+    at: "02 Sep 2026, 9:05 AM",
+  },
+];
+
 export type CallOutcomeValue =
   | "connected"
   | "no_answer"
@@ -1998,6 +2163,11 @@ export type PermittedRecord = {
   owner: string;
   /** How this user reaches it: they own it, or it is explicitly shared. */
   access: "owner" | "shared";
+  /**
+   * Lead Priority by stable id (§192). Present on Leads only — a Customer has
+   * no Lead Priority.
+   */
+  priorityId?: string;
 };
 
 /**
@@ -2020,6 +2190,7 @@ export const SALES_LEADS: readonly PermittedRecord[] = [
     product: LEAD_RECORD.product,
     owner: LEAD_RECORD.owner,
     access: "owner",
+    priorityId: "lp-warm",
   },
   {
     id: "l2041",
@@ -2029,6 +2200,7 @@ export const SALES_LEADS: readonly PermittedRecord[] = [
     product: "Health Insurance",
     owner: SALES_PERSONA.name,
     access: "owner",
+    priorityId: "lp-hot",
   },
   {
     id: "l2107",
@@ -2038,6 +2210,7 @@ export const SALES_LEADS: readonly PermittedRecord[] = [
     product: "Health Insurance",
     owner: SALES_PERSONA.name,
     access: "owner",
+    priorityId: "lp-hot",
   },
   {
     id: "l2119",
@@ -2047,6 +2220,7 @@ export const SALES_LEADS: readonly PermittedRecord[] = [
     product: "Motor Insurance",
     owner: SALES_PERSONA.name,
     access: "owner",
+    priorityId: "lp-cold",
   },
 ];
 
@@ -2730,7 +2904,31 @@ export const PIPELINE_TOTALS = {
   ),
 };
 
+/**
+ * Leads by priority, for the §21 pipeline widget's priority breakdown.
+ *
+ * §21: "the widget should also convey Lead Priority, for example as a
+ * breakdown… Priority is a separate dimension from stage. It must not be shown
+ * as an additional pipeline column."
+ *
+ * Keyed by stable id, and it includes the deactivated value because the Leads
+ * holding it still exist (§192, §207). The counts reconcile with
+ * PIPELINE_TOTALS.total: the same Leads, counted along the other axis.
+ */
+export const LEAD_PRIORITY_COUNTS: Readonly<Record<string, number>> = {
+  "lp-hot": 11,
+  "lp-warm": 19,
+  "lp-cold": 11,
+};
+
 export const RECENT_ACTIVITY: readonly Activity[] = [
+  {
+    id: "ra0",
+    title: "Priority changed by Arun",
+    detail: "Rajesh Menon · Warm → Hot",
+    time: "11:20 AM",
+    kind: "priority",
+  },
   {
     id: "ra1",
     title: "Follow-up completed",
@@ -2973,6 +3171,14 @@ export const PIPELINE_STAGES: readonly PipelineStage[] = [
   { id: "p4", name: "Quote Sent", active: true, leads: 5 },
   { id: "p5", name: "Won", active: true, leads: 4 },
   { id: "p6", name: "Lost", active: true, leads: 9 },
+  /*
+   * "Cold Call" is a pipeline STAGE — a lead-generation activity — and stays
+   * named as A&S Fincare named it. §40 forbids the priority VALUES Hot, Warm
+   * and Cold from being pipeline stages; it does not forbid a stage whose name
+   * happens to contain one of those words. The screens keep the two apart by
+   * labelling the field ("Stage: Cold Call", "Priority: Cold"), not by avoiding
+   * similar wording.
+   */
   { id: "p7", name: "Cold Call", active: false, leads: 23 },
 ];
 

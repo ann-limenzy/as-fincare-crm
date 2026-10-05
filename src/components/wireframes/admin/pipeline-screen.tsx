@@ -10,6 +10,8 @@ import {
   Plus,
   Star,
 } from "lucide-react";
+import type { Route } from "next";
+import Link from "next/link";
 import { useState } from "react";
 
 import { Button } from "@/components/ui/button";
@@ -148,6 +150,31 @@ export function PipelineScreen() {
               stops it being offered for new leads but never rewrites the 23
               leads already sitting in it.
             </Note>
+
+            {/*
+              §40 and §191: stages and Lead Priority are configured separately
+              and stored separately. Saying it here, on the stage screen, is
+              where the confusion would otherwise start — a client looking at a
+              list of configurable labels naturally wonders whether Hot belongs
+              in it.
+            */}
+            <Panel title="Stage is not priority" bodyClassName="p-4 sm:p-5">
+              <p className="text-sm leading-relaxed text-muted-foreground">
+                A stage is{" "}
+                <span className="font-medium text-foreground">
+                  where a lead has reached
+                </span>{" "}
+                in the sales process. How urgent a lead is — Hot, Warm or Cold —
+                is a separate field with its own values, and is never added to
+                this list. Moving a lead between stages leaves its priority
+                alone.
+              </p>
+              <Button variant="outline" size="sm" className="mt-3" asChild>
+                <Link href={"/wireframes/admin/lead-priority" as Route}>
+                  Lead Priority values
+                </Link>
+              </Button>
+            </Panel>
 
             <Panel title="First stage" bodyClassName="p-4 sm:p-5">
               <p className="text-sm text-muted-foreground">
