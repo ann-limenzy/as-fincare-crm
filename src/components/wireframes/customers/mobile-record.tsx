@@ -40,7 +40,6 @@ import {
 } from "@/components/wireframes/phone-frame";
 import {
   CUSTOMER_ACTIVITY,
-  CUSTOMER_POLICIES,
   CUSTOMER_RECORD,
   CUSTOMER_UPCOMING,
   FOLLOW_UP_TYPES,
@@ -48,6 +47,15 @@ import {
   TEAM,
   type CustomerActivity,
 } from "@/lib/wireframes/mock-data";
+import {
+  ClosedAmountPair,
+  PurchaseStatusBadge,
+} from "@/components/wireframes/purchase-parts";
+import {
+  completenessLabel,
+  purchasesForCustomer,
+  resolvePurchase,
+} from "@/lib/wireframes/customer-purchase";
 import { cn } from "@/lib/utils";
 
 /**
@@ -81,7 +89,9 @@ const SHEET_LABEL: Record<SheetKind, string> = {
 
 const TABS: readonly { id: TabId; label: string; short: string }[] = [
   { id: "overview", label: "Overview", short: "Overview" },
-  { id: "policies", label: "Policies & Services", short: "Policies" },
+  // §65/§66: these are Customer Purchases — one specific Plan each, not a
+  // generic "policy or service".
+  { id: "policies", label: "Purchases", short: "Purchases" },
   { id: "activity", label: "Activity", short: "Activity" },
 ];
 
@@ -304,11 +314,10 @@ export function MobileCustomerRecordScreen({
                           : "text-muted-foreground",
                       )}
                     >
-                      {/* "Policies & Services" needs ~380px to sit three-up
-                          without clipping — measured, not guessed: at 360px it
-                          rendered as "Policies & Servic…". Below that the
-                          short form shows instead. The accessible name is the
-                          full label at every width. */}
+                      {/* The long labels need ~380px to sit three-up without
+                          clipping — measured, not guessed. Below that the short
+                          form shows instead. The accessible name is the full
+                          label at every width. */}
                       <span className="block truncate min-[380px]:hidden">
                         {t.short}
                       </span>
@@ -492,67 +501,94 @@ function OverviewTab() {
 }
 
 function PoliciesTab() {
+  /*
+   * §65: the Customer's own Customer Purchases, each independent. The heading on
+   * each card is the PLAN, because §66 is explicit that a Customer buys a
+   * Plan/Sub-product and never a Product Category or a Provider — the previous
+   * version led with the category, which read as though the category itself had
+   * been purchased.
+   */
+  const purchases = purchasesForCustomer("c881");
+
   return (
     <div className="flex flex-col gap-3">
-      {CUSTOMER_POLICIES.map((p) => {
-        const due = p.status === "Due soon";
+      {purchases.map((purchase) => {
+        const result = resolvePurchase(purchase);
+        if (!result.ok) {
+          // §66: an unresolvable catalogue reference is reported, never swapped
+          // for another plan.
+          return (
+            <section
+              key={purchase.id}
+              role="note"
+              className="surface-solid rounded-xl border-danger/40 p-3 text-[12px] leading-relaxed text-danger-on-subtle"
+            >
+              {result.reason}
+            </section>
+          );
+        }
+        const { lineage, completeness, closure } = result.resolved;
         return (
-          <section
-            key={p.id}
-            className={cn(
-              "surface-solid rounded-xl p-3",
-              due && "border-warning/50",
-            )}
-          >
+          <section key={purchase.id} className="surface-solid rounded-xl p-3">
             <div className="flex min-w-0 items-start justify-between gap-2">
               <div className="min-w-0">
                 <h3 className="truncate text-[13px] font-semibold text-foreground">
-                  {p.product}
+                  {lineage.plan.name}
                 </h3>
                 <p className="truncate text-[11px] text-muted-foreground">
-                  {p.provider}
+                  {lineage.provider.name} · {lineage.category.name}
                 </p>
               </div>
-              <span
-                className={cn(
-                  "shrink-0 rounded-full border px-2 py-0.5 text-[11px] font-medium",
-                  due
-                    ? "border-warning/40 bg-warning-subtle text-warning-on-subtle"
-                    : "border-success/30 bg-success-subtle text-success-on-subtle",
-                )}
-              >
-                {p.status}
-              </span>
+              <PurchaseStatusBadge status={purchase.status} />
             </div>
 
             <div className="mt-2">
-              <Fact label="Reference" value={p.reference} />
-              <Fact label="Start date" value={p.start} />
-              <Fact label="Renewal date" value={p.renewal} />
-              <Fact label="Premium" value={p.amount} />
+              <Fact
+                label="Policy / Reference No."
+                value={purchase.policyReference ?? "Not recorded yet"}
+              />
+              <Fact label="Start date" value={purchase.startDate ?? "—"} />
+              <Fact
+                label="Renewal date"
+                value={purchase.renewalDate ?? "No further renewal"}
+              />
+              <Fact
+                label="Documents"
+                value={`${completenessLabel(purchase)} uploaded`}
+              />
             </div>
 
-            {due && p.daysLeft !== undefined ? (
-              // Never colour alone: the badge above says "Due soon" in words
-              // and this line says how soon.
-              <p className="mt-2 flex items-start gap-2 rounded-lg border border-warning/30 bg-warning-subtle px-2.5 py-2 text-[11px] leading-relaxed text-warning-on-subtle">
-                <ShieldCheck
-                  className="mt-px size-3.5 shrink-0"
-                  aria-hidden="true"
-                />
-                <span>
-                  Renews in {p.daysLeft} days. This is the renewal the current
-                  WhatsApp conversation is about.
-                </span>
+            {/*
+              §65: "a purchase whose documents are incomplete cannot be marked
+              Closed/Active and should make that visible at a glance."
+            */}
+            {!completeness.complete && !closure.ok ? (
+              <p className="mt-2 rounded-lg border border-warning/30 bg-warning-subtle px-2.5 py-2 text-[11px] leading-relaxed text-warning-on-subtle">
+                {closure.reason}
               </p>
             ) : null}
+
+            <ClosedAmountPair
+              purchase={purchase}
+              className="mt-2.5 border-t border-border pt-2.5"
+            />
+
+            <Link
+              href={
+                `/wireframes/customers/purchase?purchase=${purchase.id}` as Route
+              }
+              className="mt-2.5 inline-flex min-h-11 w-full items-center justify-center rounded-lg border border-border text-[13px] font-medium text-foreground"
+            >
+              Open purchase
+            </Link>
           </section>
         );
       })}
 
       <p className="px-1 text-[11px] leading-relaxed text-muted-foreground">
-        Concept wireframe — policy details are read-only here. Payments, claims
-        and accounting are not part of this walkthrough.
+        Each purchase is one Plan this customer bought, with its own provider,
+        policy number, documents, status and Closed Amount. Adding another plan
+        creates another purchase and never changes an existing one.
       </p>
     </div>
   );

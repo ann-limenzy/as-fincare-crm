@@ -1,3 +1,10 @@
+import { planLineage } from "@/lib/wireframes/catalogue";
+import {
+  purchaseById,
+  purchasesForCustomer,
+  type CustomerPurchase,
+} from "@/lib/wireframes/customer-purchase";
+
 /**
  * Wireframe mock data.
  *
@@ -193,7 +200,7 @@ export const COLUMN_MAPPINGS: readonly ColumnMapping[] = [
     id: "c6",
     uploadedColumn: "Policy",
     sampleValue: "Health Insurance",
-    crmField: "Product / Service Interested In",
+    crmField: "Interested In",
     status: "suggested",
   },
   {
@@ -246,7 +253,9 @@ export const CRM_FIELDS: readonly string[] = [
   // Priority does not set Stage."
   "Lead Priority",
   "Lead Source",
-  "Product / Service Interested In",
+  // §38 calls the Lead field "Interested In"; §150 matches the uploaded value
+  // against the catalogue at Product Category, Provider or Plan level.
+  "Interested In",
   "Notes",
   "Vehicle Number — Custom Field",
   "Policy Number — Custom Field",
@@ -480,6 +489,16 @@ export type MessagingEligibility =
  */
 export type LinkedPurchase = {
   readonly id: string;
+  /**
+   * The canonical `CustomerPurchase` this is a view of.
+   *
+   * §98's template variables read a purchase's Category, Provider and Plan, and
+   * Batch 4B made `CustomerPurchase` the one model that holds them. Rather than
+   * keep a second copy of those values here — which is how the Customer profile
+   * and the WhatsApp selector came to disagree about Ramesh — each entry is
+   * DERIVED from a canonical purchase and keeps its id so it can be traced back.
+   */
+  readonly customerPurchaseId: string;
   /** §98 "Product Category". */
   readonly productCategory: string;
   /** §98 "Provider". */
@@ -538,6 +557,35 @@ export type LinkedRecord = {
  * assigned to Sneha Thomas — the two are different jobs, and a template must
  * name the owner rather than whoever happens to be replying.
  */
+/**
+ * Build a WhatsApp-facing view of a canonical Customer Purchase.
+ *
+ * One function, so the two screens cannot drift: the plan, provider, category,
+ * policy reference and renewal date all come from the same record the Customer
+ * profile renders. An unresolvable id throws at module load rather than
+ * rendering a purchase whose insurer is wrong.
+ */
+function linkedPurchaseFrom(
+  purchaseId: string,
+  linkedId: string,
+): LinkedPurchase {
+  const purchase = purchaseById(purchaseId);
+  if (!purchase) {
+    throw new Error(`Unknown Customer Purchase ${purchaseId}.`);
+  }
+  const lineage = planLineage(purchase.planId);
+  if (!lineage.ok) throw new Error(lineage.reason);
+  return {
+    id: linkedId,
+    customerPurchaseId: purchase.id,
+    productCategory: lineage.lineage.category.name,
+    provider: lineage.lineage.provider.name,
+    planSubProduct: lineage.lineage.plan.name,
+    policyReference: purchase.policyReference ?? "",
+    renewalDate: purchase.renewalDate ?? "",
+  };
+}
+
 export const LINKED_RECORDS: readonly LinkedRecord[] = [
   {
     id: "c881",
@@ -546,22 +594,8 @@ export const LINKED_RECORDS: readonly LinkedRecord[] = [
     reference: "Customer · #881",
     recordOwnerUserId: "s4", // Neha Thomas — not the assignee
     purchases: [
-      {
-        id: "c881-a",
-        productCategory: "Health Insurance",
-        provider: "Star Health",
-        planSubProduct: "Family Health Optima",
-        policyReference: "POL-TEST-881-A",
-        renewalDate: "26 September 2026",
-      },
-      {
-        id: "c881-b",
-        productCategory: "Motor Insurance",
-        provider: "Shield General (sample provider)",
-        planSubProduct: "Private Car Comprehensive",
-        policyReference: "POL-TEST-881-B",
-        renewalDate: "11 January 2027",
-      },
+      linkedPurchaseFrom("cp-881-a", "c881-a"),
+      linkedPurchaseFrom("cp-881-b", "c881-b"),
     ],
   },
   {
@@ -572,16 +606,7 @@ export const LINKED_RECORDS: readonly LinkedRecord[] = [
     // Kavya is in the Motor Insurance Team, so this record sits outside a
     // Health Team Lead's scope even though the conversation does not.
     recordOwnerUserId: "s10", // Kavya Raghavan
-    purchases: [
-      {
-        id: "c904-a",
-        productCategory: "Motor Insurance",
-        provider: "Shield General (sample provider)",
-        planSubProduct: "Private Car Comprehensive",
-        policyReference: "POL-TEST-904-A",
-        renewalDate: "20 September 2026",
-      },
-    ],
+    purchases: [linkedPurchaseFrom("cp-904-a", "c904-a")],
   },
   {
     id: "c712",
@@ -589,16 +614,7 @@ export const LINKED_RECORDS: readonly LinkedRecord[] = [
     name: "Sneha Nair",
     reference: "Customer · #712",
     recordOwnerUserId: "s3", // Sneha Thomas
-    purchases: [
-      {
-        id: "c712-a",
-        productCategory: "PUC Certificate",
-        provider: "Authorised Testing Centre (sample)",
-        planSubProduct: "Private Car PUC",
-        policyReference: "PUC-TEST-712-A",
-        renewalDate: "02 October 2026",
-      },
-    ],
+    purchases: [linkedPurchaseFrom("cp-712-a", "c712-a")],
   },
   {
     id: "c688",
@@ -606,16 +622,7 @@ export const LINKED_RECORDS: readonly LinkedRecord[] = [
     name: "Fathima Rasheed",
     reference: "Customer · #688",
     recordOwnerUserId: "s3", // Sneha Thomas
-    purchases: [
-      {
-        id: "c688-a",
-        productCategory: "Motor Insurance",
-        provider: "Shield General (sample provider)",
-        planSubProduct: "Two Wheeler Comprehensive",
-        policyReference: "POL-TEST-688-A",
-        renewalDate: "09 September 2027",
-      },
-    ],
+    purchases: [linkedPurchaseFrom("cp-688-a", "c688-a")],
   },
   {
     id: "c517",
@@ -623,16 +630,7 @@ export const LINKED_RECORDS: readonly LinkedRecord[] = [
     name: "Suresh Pillai",
     reference: "Customer · #517",
     recordOwnerUserId: "s4", // Neha Thomas
-    purchases: [
-      {
-        id: "c517-a",
-        productCategory: "PUC Certificate",
-        provider: "Authorised Testing Centre (sample)",
-        planSubProduct: "Private Car PUC",
-        policyReference: "PUC-TEST-517-A",
-        renewalDate: "18 September 2026",
-      },
-    ],
+    purchases: [linkedPurchaseFrom("cp-517-a", "c517-a")],
   },
   {
     id: "c733",
@@ -640,16 +638,7 @@ export const LINKED_RECORDS: readonly LinkedRecord[] = [
     name: "Farhan Ali",
     reference: "Customer · #733",
     recordOwnerUserId: "s8", // Ajay Varma
-    purchases: [
-      {
-        id: "c733-a",
-        productCategory: "Motor Insurance",
-        provider: "Shield General (sample provider)",
-        planSubProduct: "Private Car Comprehensive",
-        policyReference: "POL-TEST-733-A",
-        renewalDate: "09 September 2027",
-      },
-    ],
+    purchases: [linkedPurchaseFrom("cp-733-a", "c733-a")],
   },
   // Leads. No Customer Purchase exists yet, so §98's policy reference and
   // renewal date genuinely have nothing to resolve from — which is why a
@@ -691,6 +680,28 @@ export const LINKED_RECORDS: readonly LinkedRecord[] = [
     purchases: [],
   },
 ];
+
+/**
+ * The name and reference to show for a Customer that holds purchases.
+ *
+ * Resolved from the linked records where the Customer also has a WhatsApp
+ * conversation, plus the few who do not. One lookup, so a purchase screen never
+ * prints whichever customer happened to be hardcoded into it.
+ */
+export function customerLabelFor(
+  customerId: string,
+): { readonly name: string; readonly reference: string } | undefined {
+  const linked = LINKED_RECORDS.find((r) => r.id === customerId);
+  if (linked) return { name: linked.name, reference: linked.reference };
+  return CUSTOMERS_WITHOUT_CONVERSATIONS[customerId];
+}
+
+/** Customers who hold a purchase but no WhatsApp conversation. */
+const CUSTOMERS_WITHOUT_CONVERSATIONS: Readonly<
+  Record<string, { readonly name: string; readonly reference: string }>
+> = {
+  c893: { name: "Anil Varghese", reference: "Customer · #893" },
+};
 
 export function linkedRecordById(id: string): LinkedRecord | undefined {
   return LINKED_RECORDS.find((r) => r.id === id);
@@ -964,44 +975,144 @@ export type Message = {
   retryOf?: string;
 };
 
-export const THREAD: readonly Message[] = [
-  {
-    id: "m1",
-    direction: "out",
-    body: "Hello Ramesh, this is A&S Fincare. Your Health Insurance policy with Star Health expires on 26 September 2026. Would you like us to assist with the renewal?",
-    time: "10:15 AM",
-    delivery: "read",
-    template: "Policy renewal reminder",
-  },
-  {
-    id: "m2",
-    direction: "in",
-    body: "Yes, please renew it",
-    time: "10:32 AM",
-  },
-  {
-    id: "m3",
-    direction: "in",
-    body: "Same cover as last year is fine. Can you send the payment link?",
-    time: "10:32 AM",
-  },
-  {
-    id: "m4",
-    direction: "out",
-    body: "Certainly. I will confirm the premium with Star Health and send the payment link before 4 PM today.",
-    time: "10:38 AM",
-    delivery: "delivered",
-  },
-  {
-    id: "m5",
-    direction: "out",
-    body: "Could you confirm a convenient time for us to discuss your renewal options?",
-    time: "10:41 AM",
-    delivery: "failed",
-    failureReason:
-      "Message not delivered — the customer's number was unreachable.",
-  },
-];
+/**
+ * Message history, keyed by conversation id.
+ *
+ * It used to be one shared `THREAD` that every conversation fell back to, which
+ * meant Vikram Reddy's conversation displayed Ramesh Kumar's renewal date and
+ * his insurer. §89.1 restricts what a user may see of ANOTHER user's
+ * conversations; showing one customer's policy inside a different customer's
+ * thread is a worse failure than that, because no permission could ever make it
+ * correct. So history is scoped by conversation and nothing falls back.
+ *
+ * A conversation with no seeded history is absent from this map, and
+ * `messagesFor` returns an empty thread for it rather than somebody else's.
+ */
+export const THREADS_BY_CONVERSATION: Readonly<
+  Record<string, readonly Message[]>
+> = {
+  /* Ramesh Kumar — Health Insurance with Star Health, renewing 26 September. */
+  w1: [
+    {
+      id: "w1-m1",
+      direction: "out",
+      // His own plan, by name. §66: a customer buys a Plan / Sub-product.
+      body: "Hello Ramesh, this is A&S Fincare. Your Family Health Optima policy with Star Health expires on 26 September 2026. Would you like us to assist with the renewal?",
+      time: "10:15 AM",
+      delivery: "read",
+      template: "Policy renewal reminder",
+    },
+    {
+      id: "w1-m2",
+      direction: "in",
+      body: "Yes, please renew it",
+      time: "10:32 AM",
+    },
+    {
+      id: "w1-m3",
+      direction: "in",
+      body: "Same cover as last year is fine. Can you send the payment link?",
+      time: "10:32 AM",
+    },
+    {
+      id: "w1-m4",
+      direction: "out",
+      body: "Certainly. I will confirm the premium with Star Health and send the payment link before 4 PM today.",
+      time: "10:38 AM",
+      delivery: "delivered",
+    },
+    {
+      id: "w1-m5",
+      direction: "out",
+      body: "Could you confirm a convenient time for us to discuss your renewal options?",
+      time: "10:41 AM",
+      delivery: "failed",
+      failureReason:
+        "Message not delivered — the customer's number was unreachable.",
+    },
+  ],
+
+  /*
+   * Vikram Reddy — his OWN Motor Insurance policy with Shield General, renewing
+   * 20 September. Nothing here mentions another customer, another plan, another
+   * insurer or another date.
+   */
+  w9: [
+    {
+      id: "w9-m1",
+      direction: "out",
+      body: "Hello Vikram, this is A&S Fincare. Your Private Car Comprehensive policy with Shield General is due for renewal on 20 September 2026.",
+      time: "Yesterday, 4:10 PM",
+      delivery: "read",
+      template: "Policy renewal reminder",
+    },
+    {
+      id: "w9-m2",
+      direction: "in",
+      body: "Noted. Please send the renewal quote.",
+      time: "Yesterday, 4:26 PM",
+    },
+    {
+      id: "w9-m3",
+      direction: "out",
+      body: "Renewal reminder sent for 20 September",
+      time: "Yesterday, 4:30 PM",
+      delivery: "delivered",
+    },
+  ],
+
+  /* Meera Krishnan — a Lead, so no policy of any kind is referred to. */
+  w7: [
+    {
+      id: "w7-m1",
+      direction: "in",
+      body: "Can you send the premium for the family plan?",
+      time: "9:58 AM",
+    },
+  ],
+
+  /* An unknown number. No record exists, so no record data is shown. */
+  w3: [
+    {
+      id: "w3-m1",
+      direction: "in",
+      body: "I need more details about motor insurance",
+      time: "9:12 AM",
+    },
+  ],
+};
+
+/**
+ * One inbound message echoing a conversation's own last message.
+ *
+ * Used for the conversations without a written-out history, so each still shows
+ * its own words rather than borrowing anybody else's. Derived from the
+ * conversation record itself, so it cannot drift from the inbox row.
+ */
+function seedFromLastMessage(conversation: Conversation): readonly Message[] {
+  return [
+    {
+      id: `${conversation.id}-m1`,
+      direction: conversation.lastDirection,
+      body: conversation.lastMessage,
+      time: conversation.time,
+      ...(conversation.lastDirection === "out"
+        ? { delivery: conversation.delivery }
+        : {}),
+    },
+  ];
+}
+
+/** Every conversation's own history. Keyed by id; nothing is shared. */
+export const CONVERSATION_THREADS: Readonly<
+  Record<string, readonly Message[]>
+> = Object.fromEntries(
+  CONVERSATIONS.map((conversation) => [
+    conversation.id,
+    THREADS_BY_CONVERSATION[conversation.id] ??
+      seedFromLastMessage(conversation),
+  ]),
+);
 
 /**
  * The complete set of template variables §98 permits — nothing else.
@@ -1601,42 +1712,44 @@ export const CUSTOMER_UPCOMING: readonly UpcomingAction[] = [
   },
 ];
 
-export type CustomerPolicy = {
-  id: string;
-  product: string;
-  provider: string;
-  /** Obviously fictional — never a real policy or government identifier. */
-  reference: string;
-  start: string;
-  renewal: string;
-  status: "Due soon" | "Active";
-  amount: string;
-  daysLeft?: number;
-};
+/*
+ * `CustomerPolicy` / `CUSTOMER_POLICIES` is gone. It modelled the purchased
+ * thing as a Product CATEGORY with a provider string, carried no Plan /
+ * Sub-product at all, mixed renewal states ("Due soon") into a purchase status,
+ * and held the premium as a formatted string. §66 and §68 replace all of that
+ * with `CustomerPurchase` in `customer-purchase.ts`, which is now the only
+ * customer-specific insurance purchase model.
+ */
 
-export const CUSTOMER_POLICIES: readonly CustomerPolicy[] = [
-  {
-    id: "p1",
-    product: "Health Insurance",
-    provider: "Star Health",
-    reference: "POL-TEST-881-A",
-    start: "26 Sep 2024",
-    renewal: "26 Sep 2026",
-    status: "Due soon",
-    amount: "₹18,400 / year",
-    daysLeft: 15,
-  },
-  {
-    id: "p2",
-    product: "Motor Insurance",
-    provider: "Shield General (sample provider)",
-    reference: "POL-TEST-881-B",
-    start: "11 Jan 2025",
-    renewal: "11 Jan 2027",
-    status: "Active",
-    amount: "₹7,250 / year",
-  },
-];
+/**
+ * Ramesh Kumar's health purchase, as the renewal and directory views need it.
+ *
+ * Read from the canonical record rather than copied, so a plan or provider
+ * rename cannot leave these screens describing a different policy. The display
+ * dates below stay as their own short-form strings: those views have always
+ * shown "26 Sep 2026" and reformatting them is not this batch's business.
+ */
+const RAMESH_HEALTH = purchaseById("cp-881-a")!;
+const RAMESH_HEALTH_LINEAGE = planLineage(RAMESH_HEALTH.planId);
+const RAMESH_MOTOR = purchaseById("cp-881-b")!;
+const RAMESH_MOTOR_LINEAGE = planLineage(RAMESH_MOTOR.planId);
+
+/** The category, provider and policy number of one canonical purchase. */
+function purchaseFacts(
+  purchase: CustomerPurchase,
+  lineage: ReturnType<typeof planLineage>,
+) {
+  if (!lineage.ok) throw new Error(lineage.reason);
+  return {
+    category: lineage.lineage.category.name,
+    provider: lineage.lineage.provider.name,
+    plan: lineage.lineage.plan.name,
+    policyRef: purchase.policyReference ?? "",
+  };
+}
+
+const RAMESH_HEALTH_FACTS = purchaseFacts(RAMESH_HEALTH, RAMESH_HEALTH_LINEAGE);
+const RAMESH_MOTOR_FACTS = purchaseFacts(RAMESH_MOTOR, RAMESH_MOTOR_LINEAGE);
 
 export type CustomerActivity = {
   id: string;
@@ -1747,7 +1860,7 @@ export type DirectoryCustomer = {
   reference: string;
   phone: string;
   email: string;
-  /** Nearest upcoming product/service (spec §53). */
+  /** Nearest upcoming renewal on one of their purchases (spec §53). */
   product: string;
   /** Spec §53 allows a count where a customer holds several. */
   serviceCount?: number;
@@ -1787,7 +1900,7 @@ export type DirectoryCustomer = {
 /**
  * Customers Sneha Thomas is permitted to work with.
  *
- * Ramesh is spread from CUSTOMER_RECORD and CUSTOMER_POLICIES rather than
+ * Ramesh is spread from CUSTOMER_RECORD and his canonical purchase rather than
  * retyped, so his phone, email, owner, policy reference and renewal date
  * cannot drift away from the record screen and the WhatsApp flow.
  *
@@ -1804,12 +1917,12 @@ export const DIRECTORY_CUSTOMERS: readonly DirectoryCustomer[] = [
     reference: CUSTOMER_RECORD.reference,
     phone: CUSTOMER_RECORD.phone,
     email: CUSTOMER_RECORD.email,
-    product: CUSTOMER_POLICIES[0]!.product,
-    serviceCount: CUSTOMER_POLICIES.length,
-    policyRef: CUSTOMER_POLICIES[0]!.reference,
+    product: RAMESH_HEALTH_FACTS.category,
+    serviceCount: purchasesForCustomer("c881").length,
+    policyRef: RAMESH_HEALTH_FACTS.policyRef,
     owner: CUSTOMER_RECORD.owner,
-    renewal: CUSTOMER_POLICIES[0]!.renewal,
-    renewalInDays: CUSTOMER_POLICIES[0]!.daysLeft ?? 0,
+    renewal: "26 Sep 2026",
+    renewalInDays: 15, // 26 Sep 2026, from PRESENTATION_TODAY
     renewalStatus: "Upcoming",
     followUp: { label: "14 Sep 2026, 10:00 AM", inDays: 3 },
     lastActivity: "WhatsApp · Today, 10:41 AM",
@@ -2092,7 +2205,7 @@ export const MOBILE_FOLLOW_UPS: readonly MobileFollowUp[] = [
     person: CUSTOMER_RECORD.name,
     recordType: "Customer",
     reference: CUSTOMER_RECORD.reference,
-    product: CUSTOMER_POLICIES[0]!.product,
+    product: RAMESH_HEALTH_FACTS.category,
     type: "Call",
     date: "14 Sep 2026",
     time: "10:00 AM",
@@ -2329,7 +2442,7 @@ export type MobileRenewal = {
  * neither.
  *
  * Ramesh's health renewal is spread from CUSTOMER_RECORD and
- * CUSTOMER_POLICIES, and its reminder schedule is §68's own worked example
+ * his canonical purchase, and its reminder schedule is §68's own worked example
  * (30 days before Sent 27 Aug · 7 days before Scheduled 19 Sep · 1 day before
  * Scheduled 25 Sep) — which is that renewal, because §68 was written around
  * a 26 Sep due date.
@@ -2498,11 +2611,11 @@ export const MOBILE_RENEWALS: readonly MobileRenewal[] = [
     id: "r881a",
     customer: CUSTOMER_RECORD.name,
     reference: CUSTOMER_RECORD.reference,
-    product: CUSTOMER_POLICIES[0]!.product,
-    provider: CUSTOMER_POLICIES[0]!.provider,
-    policyRef: CUSTOMER_POLICIES[0]!.reference,
-    due: CUSTOMER_POLICIES[0]!.renewal,
-    dueInDays: CUSTOMER_POLICIES[0]!.daysLeft ?? 0,
+    product: RAMESH_HEALTH_FACTS.category,
+    provider: RAMESH_HEALTH_FACTS.provider,
+    policyRef: RAMESH_HEALTH_FACTS.policyRef,
+    due: "26 Sep 2026",
+    dueInDays: 15, // 26 Sep 2026, from PRESENTATION_TODAY
     status: "Upcoming",
     // §65's own example: Record Owner Arun, renewal Assigned To Sneha.
     recordOwner: CUSTOMER_RECORD.owner,
@@ -2571,10 +2684,10 @@ export const MOBILE_RENEWALS: readonly MobileRenewal[] = [
     id: "r881b",
     customer: CUSTOMER_RECORD.name,
     reference: CUSTOMER_RECORD.reference,
-    product: CUSTOMER_POLICIES[1]!.product,
-    provider: CUSTOMER_POLICIES[1]!.provider,
-    policyRef: CUSTOMER_POLICIES[1]!.reference,
-    due: CUSTOMER_POLICIES[1]!.renewal,
+    product: RAMESH_MOTOR_FACTS.category,
+    provider: RAMESH_MOTOR_FACTS.provider,
+    policyRef: RAMESH_MOTOR_FACTS.policyRef,
+    due: "11 Jan 2027",
     dueInDays: 122,
     status: "Upcoming",
     recordOwner: CUSTOMER_RECORD.owner,
@@ -2821,8 +2934,8 @@ export type RenewalRow = {
 /**
  * The manager's view of renewals falling due across the whole team.
  *
- * Every row must be a CUSTOMER. A renewal belongs to a Customer
- * Product/Service (§62), so an active Lead cannot hold one — this list
+ * Every row must be a CUSTOMER. A renewal belongs to a Customer Purchase
+ * (§65, §69), so an active Lead cannot hold one — this list
  * previously carried Anitha Desai and Meera Krishnan, who are Leads #2044 and
  * #2041, and one of them was even shown against a product she had not
  * enquired about.
@@ -2848,9 +2961,9 @@ export const UPCOMING_RENEWALS: readonly RenewalRow[] = [
     // the shared customer record already defines.
     id: "rn2",
     customer: CUSTOMER_RECORD.name,
-    service: CUSTOMER_POLICIES[0]!.product,
-    dueDate: CUSTOMER_POLICIES[0]!.renewal,
-    daysLeft: CUSTOMER_POLICIES[0]!.daysLeft ?? 0,
+    service: RAMESH_HEALTH_FACTS.category,
+    dueDate: "26 Sep 2026",
+    daysLeft: 15, // 26 Sep 2026, from PRESENTATION_TODAY
     status: "Due Soon",
   },
   {
@@ -3182,51 +3295,13 @@ export const PIPELINE_STAGES: readonly PipelineStage[] = [
   { id: "p7", name: "Cold Call", active: false, leads: 23 },
 ];
 
-export type ProductRow = {
-  id: string;
-  name: string;
-  category: string;
-  renewable: boolean;
-  activeCustomers: number;
-};
-
-export const PRODUCTS: readonly ProductRow[] = [
-  {
-    id: "pr1",
-    name: "Health Insurance",
-    category: "Insurance",
-    renewable: true,
-    activeCustomers: 218,
-  },
-  {
-    id: "pr2",
-    name: "Motor Insurance",
-    category: "Insurance",
-    renewable: true,
-    activeCustomers: 164,
-  },
-  {
-    id: "pr3",
-    name: "PUC Certificate",
-    category: "Compliance",
-    renewable: true,
-    activeCustomers: 87,
-  },
-  {
-    id: "pr4",
-    name: "Term Life Insurance",
-    category: "Insurance",
-    renewable: true,
-    activeCustomers: 52,
-  },
-  {
-    id: "pr5",
-    name: "Mutual Fund SIP",
-    category: "Investment",
-    renewable: false,
-    activeCustomers: 41,
-  },
-];
+/*
+ * The flat `ProductRow` / `PRODUCTS` model is gone. §66 and §193 define three
+ * separate levels — Product Category, Provider and Plan / Sub-product — and a
+ * single "product with a category column" could not express which provider a
+ * plan belongs to, nor stop a purchase being recorded against a category. The
+ * catalogue now lives in `catalogue.ts`.
+ */
 
 export const REMINDER_RULES = [
   {

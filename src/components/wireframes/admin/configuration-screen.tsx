@@ -1,8 +1,11 @@
 "use client";
 
 import {
+  Building2,
   CalendarCheck,
   CircleAlert,
+  Info,
+  Layers,
   Mail,
   MessageCircle,
   Package,
@@ -23,10 +26,23 @@ import {
 import {
   EMAIL_TEMPLATES,
   FOLLOW_UP_DEFAULTS,
-  PRODUCTS,
   REMINDER_RULES,
   TEMPLATES,
 } from "@/lib/wireframes/mock-data";
+import {
+  PLANS,
+  PRODUCT_CATEGORIES,
+  PROVIDERS,
+  UNKNOWN_CATALOGUE_LABEL,
+  catalogueProblems,
+  categoryById,
+  mayDeactivateCategory,
+  orderedCategories,
+  planLineage,
+  plansByProvider,
+  plansInCategory,
+  providersForCategory,
+} from "@/lib/wireframes/catalogue";
 import { templateUnavailableReason } from "@/lib/wireframes/whatsapp-messaging";
 import { cn } from "@/lib/utils";
 
@@ -40,7 +56,7 @@ import { cn } from "@/lib/utils";
  */
 
 const TABS = [
-  { id: "products", label: "Products and services", icon: Package },
+  { id: "products", label: "Product Catalogue", icon: Package },
   { id: "reminders", label: "Renewal reminders", icon: Timer },
   { id: "followups", label: "Follow-up defaults", icon: CalendarCheck },
   { id: "whatsapp", label: "WhatsApp templates", icon: MessageCircle },
@@ -100,77 +116,227 @@ export function ConfigurationScreen() {
 }
 
 function ProductsTab() {
+  /*
+   * §193: the Product Catalogue, at its three levels. §66 is explicit that
+   * these are three separate things and that a Customer buys only the third —
+   * a flat "products and services" list with a category column could not say
+   * which provider a plan belongs to, and invited a purchase against the
+   * category itself.
+   */
+  const problems = catalogueProblems();
   return (
-    <Panel
-      title="Products and services"
-      icon={Package}
-      count={PRODUCTS.length}
-      action={
-        <Button size="sm">
-          <Plus className="size-4" aria-hidden="true" />
-          Add product
-        </Button>
-      }
-    >
-      <TableScroll>
-        <table className="w-full min-w-[40rem] text-sm">
-          <thead>
-            <tr className="border-b border-border text-left text-xs text-muted-foreground">
-              <th scope="col" className="px-4 py-2.5 font-medium">
-                Product / service
-              </th>
-              <th scope="col" className="px-4 py-2.5 font-medium">
-                Category
-              </th>
-              <th scope="col" className="px-4 py-2.5 font-medium">
-                Renewable
-              </th>
-              <th scope="col" className="px-4 py-2.5 font-medium">
-                Active customers
-              </th>
-              <th scope="col" className="px-4 py-2.5 font-medium">
-                <span className="sr-only">Actions</span>
-              </th>
-            </tr>
-          </thead>
-          <tbody>
-            {PRODUCTS.map((p) => (
-              <tr
-                key={p.id}
-                className="border-b border-border/70 last:border-0"
+    <div className="flex min-w-0 flex-col gap-4">
+      <Note icon={Info}>
+        The catalogue is{" "}
+        <strong className="font-semibold">reference data</strong>. A customer
+        buys a <strong className="font-semibold">Plan / Sub-product</strong> —
+        never a category or a provider on its own. Deactivating an entry stops
+        it being chosen for new purchases and never alters an existing one.
+      </Note>
+
+      {problems.length > 0 ? (
+        <p
+          role="alert"
+          className="rounded-lg border border-danger/30 bg-danger-subtle px-3 py-2.5 text-sm text-danger-on-subtle"
+        >
+          {problems.join(" ")}
+        </p>
+      ) : null}
+
+      <Panel
+        title="Product Categories"
+        icon={Layers}
+        count={PRODUCT_CATEGORIES.length}
+        action={
+          <Button size="sm">
+            <Plus className="size-4" aria-hidden="true" />
+            Add category
+          </Button>
+        }
+      >
+        <ul className="divide-y divide-border/70">
+          {orderedCategories().map((category, index) => {
+            const deactivate = mayDeactivateCategory(category.id);
+            return (
+              <li
+                key={category.id}
+                className="flex flex-wrap items-center gap-3 px-4 py-3"
               >
-                <td className="px-4 py-3 font-medium text-foreground">
-                  {p.name}
-                </td>
-                <td className="px-4 py-3 text-muted-foreground">
-                  {p.category}
-                </td>
-                <td className="px-4 py-3">
-                  <span
-                    className={cn(
-                      "inline-flex rounded-full border px-2.5 py-0.5 text-xs font-medium",
-                      p.renewable
-                        ? "border-success/30 bg-success-subtle text-success-on-subtle"
-                        : "border-border bg-muted text-muted-foreground",
-                    )}
-                  >
-                    {p.renewable ? "Renewable" : "One-off"}
+                <span className="w-6 shrink-0 text-center text-xs text-muted-foreground">
+                  {index + 1}
+                </span>
+                <span className="min-w-0 flex-1">
+                  <span className="block text-sm font-medium text-foreground">
+                    {category.name}
                   </span>
-                </td>
-                <td className="px-4 py-3 text-muted-foreground tabular-nums">
-                  {p.activeCustomers}
-                </td>
-                <td className="px-4 py-3">
-                  <Button variant="outline" size="sm">
-                    Edit
+                  <span className="mt-0.5 block text-xs text-muted-foreground">
+                    {plansInCategory(category.id).length} plans ·{" "}
+                    {providersForCategory(category.id).length} active providers
+                  </span>
+                </span>
+                <CatalogueStatus active={category.active} />
+                {/*
+                  §193.1: "a Category cannot be deactivated while it has active
+                  Providers or Plans still available for selection."
+                */}
+                <span className="shrink-0">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="min-h-11 sm:min-h-9"
+                    disabled={!deactivate.ok}
+                    title={deactivate.ok ? undefined : deactivate.reason}
+                  >
+                    Deactivate
                   </Button>
-                </td>
+                </span>
+              </li>
+            );
+          })}
+        </ul>
+      </Panel>
+
+      <Panel
+        title="Providers"
+        icon={Building2}
+        count={PROVIDERS.length}
+        action={
+          <Button size="sm">
+            <Plus className="size-4" aria-hidden="true" />
+            Add provider
+          </Button>
+        }
+      >
+        <ul className="divide-y divide-border/70">
+          {PROVIDERS.map((provider) => (
+            <li
+              key={provider.id}
+              className="flex flex-wrap items-center gap-3 px-4 py-3"
+            >
+              <span className="min-w-0 flex-1">
+                <span className="block text-sm font-medium text-foreground">
+                  {provider.name}
+                </span>
+                {/*
+                  §193.2 and §66: "a Provider may offer multiple Plans, across
+                  more than one Product Category." So the categories it operates
+                  in are a list.
+                */}
+                <span className="mt-0.5 block text-xs text-muted-foreground">
+                  {provider.categoryIds
+                    .map(
+                      (id) => categoryById(id)?.name ?? UNKNOWN_CATALOGUE_LABEL,
+                    )
+                    .join(" · ")}{" "}
+                  · {plansByProvider(provider.id).length} plans
+                </span>
+              </span>
+              <CatalogueStatus active={provider.active} />
+              <Button
+                variant="outline"
+                size="sm"
+                className="min-h-11 shrink-0 sm:min-h-9"
+              >
+                Edit
+              </Button>
+            </li>
+          ))}
+        </ul>
+      </Panel>
+
+      <Panel
+        title="Plans / Sub-products"
+        icon={Package}
+        count={PLANS.length}
+        action={
+          <Button size="sm">
+            <Plus className="size-4" aria-hidden="true" />
+            Add plan
+          </Button>
+        }
+      >
+        <TableScroll>
+          <table className="w-full min-w-[42rem] text-sm">
+            <thead>
+              <tr className="border-b border-border text-left text-xs text-muted-foreground">
+                <th scope="col" className="px-4 py-2.5 font-medium">
+                  Plan / Sub-product
+                </th>
+                <th scope="col" className="px-4 py-2.5 font-medium">
+                  Provider
+                </th>
+                <th scope="col" className="px-4 py-2.5 font-medium">
+                  Product Category
+                </th>
+                <th scope="col" className="px-4 py-2.5 font-medium">
+                  Status
+                </th>
+                <th scope="col" className="px-4 py-2.5 font-medium">
+                  <span className="sr-only">Actions</span>
+                </th>
               </tr>
-            ))}
-          </tbody>
-        </table>
-      </TableScroll>
-    </Panel>
+            </thead>
+            <tbody>
+              {PLANS.map((plan) => {
+                // §193.3: exactly one provider and exactly one category each.
+                const lineage = planLineage(plan.id);
+                return (
+                  <tr
+                    key={plan.id}
+                    className="border-b border-border/70 last:border-0"
+                  >
+                    <td className="px-4 py-3 font-medium text-foreground">
+                      {plan.name}
+                    </td>
+                    <td className="px-4 py-3 text-muted-foreground">
+                      {lineage.ok
+                        ? lineage.lineage.provider.name
+                        : UNKNOWN_CATALOGUE_LABEL}
+                    </td>
+                    <td className="px-4 py-3 text-muted-foreground">
+                      {lineage.ok
+                        ? lineage.lineage.category.name
+                        : UNKNOWN_CATALOGUE_LABEL}
+                    </td>
+                    <td className="px-4 py-3">
+                      <CatalogueStatus active={plan.active} />
+                    </td>
+                    <td className="px-4 py-3">
+                      <Button variant="outline" size="sm">
+                        Edit
+                      </Button>
+                    </td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        </TableScroll>
+      </Panel>
+
+      <Note icon={CircleAlert} tone="warning">
+        A withdrawn plan stays on the purchases that already hold it, with its
+        policy number, documents, Closed Amount and renewal history intact. It
+        is simply no longer offered when recording a new purchase. The catalogue
+        connects to no provider system.
+      </Note>
+    </div>
+  );
+}
+
+/** Active or inactive, in words. Never colour alone. */
+function CatalogueStatus({ active }: { active: boolean }) {
+  return (
+    <span
+      className={cn(
+        "shrink-0 rounded-full border px-2.5 py-0.5 text-xs font-medium whitespace-nowrap",
+        active
+          ? "border-success/30 bg-success-subtle text-success-on-subtle"
+          : "border-border-strong/40 bg-neutral-subtle text-neutral-on-subtle",
+      )}
+    >
+      {active ? "Active" : "Inactive"}
+    </span>
   );
 }
 

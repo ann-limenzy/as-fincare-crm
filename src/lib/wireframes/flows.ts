@@ -199,6 +199,14 @@ export const FLOWS: readonly Flow[] = [
           "Reached from the directory or mid-chat from WhatsApp. Shows that the record owner and the conversation assignee are two different people.",
         device: "mobile",
       },
+      {
+        href: "/wireframes/customers/purchase",
+        label: "Customer Purchase",
+        title: "Customer Purchase and its policy documents",
+        summary:
+          "One plan this customer bought: its provider and category, the required policy documents that gate Closed/Active, and the difference between a recorded and an eligible Closed Amount.",
+        device: "mobile",
+      },
     ],
   },
   {

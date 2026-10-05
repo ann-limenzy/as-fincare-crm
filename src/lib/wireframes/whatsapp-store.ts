@@ -14,7 +14,7 @@
  */
 import {
   CONVERSATIONS,
-  THREAD,
+  CONVERSATION_THREADS,
   type Conversation,
   type Message,
 } from "@/lib/wireframes/mock-data";
@@ -42,9 +42,8 @@ type State = {
   /**
    * Threads the walkthrough has changed, keyed by conversation id.
    *
-   * Absent means "unchanged", and `messagesFor` falls back to the seeded
-   * thread. Storing only what was touched keeps the reset trivial and avoids
-   * inventing a separate mock thread for every conversation.
+   * Absent means "unchanged", and `messagesFor` reads that conversation's OWN
+   * seeded history. Storing only what was touched keeps the reset trivial.
    */
   readonly messages: Readonly<Record<string, readonly Message[]>>;
   /** How many messages the walkthrough has sent, for the demo clock. */
@@ -139,17 +138,29 @@ export function conversationById(
 /* ------------------------------------------------------------- messages */
 
 /**
- * The thread for one conversation.
+ * The message history of ONE conversation.
  *
- * Every conversation starts from the same seeded thread — a wireframe
- * simplification that predates this batch — and diverges as soon as the
- * walkthrough sends something on it.
+ * Scoped by id throughout. Two conversations never share a history, and a
+ * conversation with no seeded messages has an empty one.
  */
+/** No conversation's history is ever substituted for another's. */
+const NO_MESSAGES: readonly Message[] = [];
+
 export function messagesFor(
   conversationId: string,
   s: State = state,
 ): readonly Message[] {
-  return s.messages[conversationId] ?? THREAD;
+  /*
+   * Three steps, and none of them is a fallback to somebody else's thread:
+   * what the walkthrough changed, else this conversation's own seeded history,
+   * else nothing at all. An unknown id gets an empty thread — never the first
+   * conversation's, which is how Vikram's screen once showed Ramesh's renewal.
+   */
+  return (
+    s.messages[conversationId] ??
+    CONVERSATION_THREADS[conversationId] ??
+    NO_MESSAGES
+  );
 }
 
 function putMessages(

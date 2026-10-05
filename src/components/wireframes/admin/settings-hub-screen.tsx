@@ -30,6 +30,11 @@ import {
   configStatus,
   teamWarning,
 } from "@/lib/wireframes/sales-teams";
+import {
+  PLANS,
+  PRODUCT_CATEGORIES,
+  PROVIDERS,
+} from "@/lib/wireframes/catalogue";
 import { selectablePriorities } from "@/lib/wireframes/lead-priority";
 import { cn } from "@/lib/utils";
 
@@ -148,16 +153,16 @@ const CARDS: readonly Card[] = [
   {
     id: "products",
     href: "/wireframes/admin/configuration",
-    title: "Products and services",
+    title: "Product Catalogue",
     icon: Package,
-    summary: "5 products · 4 renewable",
+    summary: `${PRODUCT_CATEGORIES.length} categories · ${PROVIDERS.length} providers · ${PLANS.length} plans`,
     detail:
-      "What the business sells. Renewable products drive the renewal reminders.",
+      "What A&S Fincare distributes, in three levels: Product Category, Provider and Plan / Sub-product. A customer buys a plan.",
     items: [
-      "Product list",
-      "Categories",
-      "Renewable products",
-      "Add a product",
+      "Product Categories",
+      "Providers",
+      "Plans / Sub-products",
+      "Required policy documents",
     ],
   },
   {

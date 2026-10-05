@@ -196,9 +196,18 @@ export function MobileConversationScreen() {
             }
           >
             <div className="flex flex-col gap-3 bg-muted/40 px-3 py-4">
-              <p className="text-center text-[11px] font-medium text-muted-foreground">
-                Today
-              </p>
+              {thread.length === 0 ? (
+                <p
+                  role="note"
+                  className="text-center text-[11px] leading-relaxed text-muted-foreground"
+                >
+                  No messages have been exchanged on this conversation yet.
+                </p>
+              ) : (
+                <p className="text-center text-[11px] font-medium text-muted-foreground">
+                  Today
+                </p>
+              )}
               {thread.map((m) => {
                 const outgoing = m.direction === "out";
                 const failed = m.delivery === "failed";

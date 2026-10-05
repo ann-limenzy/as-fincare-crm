@@ -32,9 +32,9 @@ import {
 import { Note, Panel } from "@/components/wireframes/wf-ui";
 import {
   CONVERSATIONS,
-  CUSTOMER_POLICIES,
   CUSTOMER_RECORD,
   TEMPLATES,
+  linkedRecordById,
   type Message,
   type Template,
 } from "@/lib/wireframes/mock-data";
@@ -225,6 +225,10 @@ export function ConversationScreen({
     ? userById(conversation.assignedToUserId)
     : null;
   const history = assignmentsFor(conversation.id, store);
+  const linkedRenewalDate = conversation.linkedRecordId
+    ? (linkedRecordById(conversation.linkedRecordId)?.purchases[0]
+        ?.renewalDate ?? null)
+    : null;
   const canAssign =
     target !== "" && mayAssignConversation(viewer, conversation, target);
 
@@ -326,9 +330,23 @@ export function ConversationScreen({
 
             {/* Thread */}
             <div className="flex flex-col gap-3.5 bg-muted/40 px-4 py-5 sm:px-5">
-              <p className="text-center text-[11px] font-medium text-muted-foreground">
-                Today
-              </p>
+              {thread.length === 0 ? (
+                /*
+                  An explicit empty state. Falling back to another
+                  conversation's history is how one customer's policy ended up
+                  on a different customer's screen.
+                */
+                <p
+                  role="note"
+                  className="text-center text-[11px] leading-relaxed text-muted-foreground"
+                >
+                  No messages have been exchanged on this conversation yet.
+                </p>
+              ) : (
+                <p className="text-center text-[11px] font-medium text-muted-foreground">
+                  Today
+                </p>
+              )}
               {thread.map((m) => (
                 <MessageBubble
                   key={m.id}
@@ -670,9 +688,14 @@ export function ConversationScreen({
               <dl className="flex flex-col gap-3.5 text-sm">
                 <ContextRow label="Record" value={conversation.recordLabel} />
                 <ContextRow label="Product" value={conversation.product} />
+                {/*
+                  The renewal date on the conversation's own linked purchase,
+                  rather than whichever policy happened to be first in a shared
+                  list. §98 already resolves this per conversation.
+                */}
                 <ContextRow
                   label="Renewal due"
-                  value={CUSTOMER_POLICIES[0]!.renewal}
+                  value={linkedRenewalDate ?? "No renewal date recorded"}
                 />
                 <ContextRow
                   label="Record owner"
