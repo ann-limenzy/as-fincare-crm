@@ -82,7 +82,12 @@ const MOBILE_NAV: readonly {
     icon: LayoutDashboard,
     href: "/wireframes/sales/today",
   },
-  { id: "leads", label: "Leads", icon: Users },
+  {
+    id: "leads",
+    label: "Leads",
+    icon: Users,
+    href: "/wireframes/leads/mobile",
+  },
   {
     id: "customers",
     label: "Customers",

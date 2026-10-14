@@ -37,7 +37,8 @@ export type Flow = {
     | "Ellipsis"
     | "LayoutDashboard"
     | "Settings"
-    | "UsersRound";
+    | "UsersRound"
+    | "Users";
   readonly description: string;
   readonly device: Device | "both";
   readonly steps: readonly Step[];
@@ -171,6 +172,32 @@ export const FLOWS: readonly Flow[] = [
         title: "When sending is blocked",
         summary:
           "What the salesperson sees when WhatsApp is not connected, the customer opted out, or a message fails.",
+        device: "desktop",
+      },
+    ],
+  },
+  {
+    id: "leads",
+    name: "Lead Management",
+    icon: "Users",
+    description:
+      "The list a salesperson opens first: who is waiting on a call today, which follow-up is already late, and what each lead is interested in. Cards on a phone, a table at a desk — one workflow at two widths.",
+    device: "both",
+    steps: [
+      {
+        href: "/wireframes/leads/mobile",
+        label: "Leads on a phone",
+        title: "Lead list on a phone",
+        summary:
+          "Search, quick filters and readable cards, with overdue follow-ups called out and Call and WhatsApp kept apart from the tap that opens the record.",
+        device: "mobile",
+      },
+      {
+        href: "/wireframes/leads/list",
+        label: "Leads list",
+        title: "Lead list on the desktop",
+        summary:
+          "The same leads, filters and actions in a table: priority and stage as separate columns, next follow-up kept prominent, with a result count and pagination.",
         device: "desktop",
       },
     ],

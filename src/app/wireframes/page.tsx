@@ -5,11 +5,12 @@ import {
   LayoutDashboard,
   MessageCircle,
   Monitor,
-  Settings,
   RefreshCw,
+  Settings,
   Smartphone,
   Upload,
   UserRound,
+  Users,
   UsersRound,
   type LucideIcon,
 } from "lucide-react";
@@ -38,6 +39,7 @@ const ICONS: Record<Flow["icon"], LucideIcon> = {
   LayoutDashboard,
   Settings,
   UsersRound,
+  Users,
 };
 
 export default function WireframesIndexPage() {

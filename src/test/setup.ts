@@ -22,6 +22,12 @@ Object.defineProperty(window, "matchMedia", {
   }),
 });
 
+// jsdom implements neither of these; PhoneSheet moves focus into itself on
+// open and calls scrollIntoView to keep the sheet in view on a short viewport.
+if (!Element.prototype.scrollIntoView) {
+  Element.prototype.scrollIntoView = () => {};
+}
+
 globalThis.ResizeObserver = class {
   observe() {}
   unobserve() {}

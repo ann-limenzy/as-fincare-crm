@@ -65,7 +65,7 @@ const NAV: readonly NavEntry[] = [
     icon: LayoutDashboard,
     href: "/wireframes/admin/dashboard",
   },
-  { id: "leads", label: "Leads", icon: Users },
+  { id: "leads", label: "Leads", icon: Users, href: "/wireframes/leads/list" },
   { id: "customers", label: "Customers", icon: Building2 },
   { id: "follow-ups", label: "Follow-ups", icon: CalendarCheck },
   { id: "renewals", label: "Renewals & Reminders", icon: BellRing },
@@ -90,10 +90,24 @@ const SECONDARY: readonly NavEntry[] = [
 export function CrmChrome({
   active,
   children,
+  viewer = CURRENT_USER,
+  showQuickAdd = true,
 }: {
   /** Nav id to show as the current destination. */
   active: string;
   children: ReactNode;
+  /**
+   * Who the screen is presented as. Defaults to the administrator persona the
+   * other desktop wireframes use; a screen that demonstrates an operational
+   * role passes its own so the header name matches the records on the page.
+   */
+  viewer?: { name: string; initials: string };
+  /**
+   * The top bar's shortcut to lead creation. A screen whose own heading
+   * already carries that primary action turns it off rather than showing the
+   * same button twice.
+   */
+  showQuickAdd?: boolean;
 }) {
   return (
     // `overflow-x-clip` rather than `-hidden`: clip contains the wide tables
@@ -104,7 +118,7 @@ export function CrmChrome({
         <Sidebar active={active} />
 
         <div className="min-w-0 flex-1">
-          <TopBar />
+          <TopBar viewer={viewer} showQuickAdd={showQuickAdd} />
           <main className="px-4 py-5 sm:px-6">
             <div className="mx-auto w-full max-w-[1400px] min-w-0">
               {children}
@@ -215,7 +229,13 @@ function NavRow({ item, active }: { item: NavEntry; active: boolean }) {
   );
 }
 
-function TopBar() {
+function TopBar({
+  viewer,
+  showQuickAdd,
+}: {
+  viewer: { name: string; initials: string };
+  showQuickAdd: boolean;
+}) {
   return (
     <div className="surface-glass sticky top-0 z-20 rounded-none border-x-0 border-t-0 px-4 py-3 sm:px-6">
       <div className="mx-auto flex w-full max-w-[1400px] items-center gap-3">
@@ -239,16 +259,18 @@ function TopBar() {
         </span>
 
         <span className="flex shrink-0 items-center gap-2">
-          <Avatar initials={CURRENT_USER.initials} />
+          <Avatar initials={viewer.initials} />
           <span className="hidden text-sm font-medium text-foreground sm:inline">
-            {CURRENT_USER.name}
+            {viewer.name}
           </span>
         </span>
 
-        <span className="hidden shrink-0 items-center gap-1.5 rounded-lg bg-primary px-3 py-2 text-sm font-medium text-primary-foreground sm:inline-flex">
-          <Plus className="size-4" aria-hidden="true" />
-          Add Lead
-        </span>
+        {showQuickAdd ? (
+          <span className="hidden shrink-0 items-center gap-1.5 rounded-lg bg-primary px-3 py-2 text-sm font-medium text-primary-foreground sm:inline-flex">
+            <Plus className="size-4" aria-hidden="true" />
+            Add Lead
+          </span>
+        ) : null}
       </div>
     </div>
   );
