@@ -11,7 +11,7 @@ unbuilt modules say so explicitly rather than showing placeholder data.
 
 ```bash
 npm install
-npm run dev          # http://localhost:3000
+npm run dev          # http://localhost:5000
 ```
 
 Requires **Node >= 20.19**. See `docs/architecture-decisions.md` §8 for why the
